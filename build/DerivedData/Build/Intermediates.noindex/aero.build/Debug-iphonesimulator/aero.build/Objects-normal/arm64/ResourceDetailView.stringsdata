@@ -1,0 +1,48 @@
+{
+  "source": "/Users/Alumno/Desktop/hackathon/aero/aero/Views/ResourceDetailView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Recurso",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 64
+        }
+      },
+      {
+        "comment": "",
+        "key": "Título",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 26
+        }
+      },
+      {
+        "comment": "",
+        "key": "Título",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 28
+        }
+      },
+      {
+        "comment": "",
+        "key": "Contenido",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 35
+        }
+      },
+      {
+        "comment": "",
+        "key": "Guardar",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 68
+        }
+      }
+    ]
+  },
+  "version": 1
+}

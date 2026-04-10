@@ -10,7 +10,7 @@ struct AeroAppBackground: View {
                 colors: [
                     Color.indigo.opacity(0.16),
                     Color.purple.opacity(0.10),
-                    Color(uiColor: .systemGroupedBackground)
+                    Color.aeroGroupedBackground
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

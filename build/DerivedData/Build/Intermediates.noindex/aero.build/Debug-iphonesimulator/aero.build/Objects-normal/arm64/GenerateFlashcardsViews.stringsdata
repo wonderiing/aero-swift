@@ -1,0 +1,368 @@
+{
+  "source": "/Users/Alumno/Desktop/hackathon/aero/aero/Views/GenerateFlashcardsViews.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "%lld seleccionado%@",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 133
+        }
+      },
+      {
+        "comment": "",
+        "key": "Seleccionado",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 204
+        }
+      },
+      {
+        "comment": "",
+        "key": "No seleccionado",
+        "location": {
+          "startingColumn": 59,
+          "startingLine": 204
+        }
+      },
+      {
+        "comment": "",
+        "key": "Activa el interruptor para incluir este recurso.",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 205
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 175
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 287
+        }
+      },
+      {
+        "comment": "",
+        "key": "Generar flashcards",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 554
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 372
+        }
+      },
+      {
+        "comment": "",
+        "key": "Apple Intelligence activa",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 365
+        }
+      },
+      {
+        "comment": "",
+        "key": "Generación on-device (más rápida y privada).",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 367
+        }
+      },
+      {
+        "comment": "",
+        "key": "Ve a Ajustes → Apple Intelligence y Siri y espera a que termine. En simulador, la descarga ocurre en tu Mac host (requiere Apple Silicon).",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 386
+        }
+      },
+      {
+        "comment": "",
+        "key": "Modelo descargándose…",
+        "location": {
+          "startingColumn": 47,
+          "startingLine": 383
+        }
+      },
+      {
+        "comment": "",
+        "key": "Apple Intelligence no disponible",
+        "location": {
+          "startingColumn": 47,
+          "startingLine": 390
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cantidad orientativa",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 413
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cantidad",
+        "location": {
+          "startingColumn": 44,
+          "startingLine": 415
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pocas",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 416
+        }
+      },
+      {
+        "comment": "",
+        "key": "Media",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 417
+        }
+      },
+      {
+        "comment": "",
+        "key": "Muchas",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 418
+        }
+      },
+      {
+        "comment": "",
+        "key": "Ideal para un repaso rápido.",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 431
+        }
+      },
+      {
+        "comment": "",
+        "key": "Equilibrado para estudiar.",
+        "location": {
+          "startingColumn": 100,
+          "startingLine": 431
+        }
+      },
+      {
+        "comment": "",
+        "key": "Más cobertura, tarda un poco más.",
+        "location": {
+          "startingColumn": 131,
+          "startingLine": 431
+        }
+      },
+      {
+        "comment": "",
+        "key": "Selecciona 1 o más recursos. Cuanto mejor sea el texto, mejores serán las tarjetas.",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 460
+        }
+      },
+      {
+        "comment": "",
+        "key": "No se pudo generar",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 472
+        }
+      },
+      {
+        "comment": "",
+        "key": "Añade al menos un recurso con texto para generar flashcards.",
+        "location": {
+          "startingColumn": 47,
+          "startingLine": 496
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sin recursos",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 494
+        }
+      },
+      {
+        "comment": "",
+        "key": "Generando…",
+        "location": {
+          "startingColumn": 53,
+          "startingLine": 510
+        }
+      },
+      {
+        "comment": "",
+        "key": "Generar flashcards",
+        "location": {
+          "startingColumn": 70,
+          "startingLine": 510
+        }
+      },
+      {
+        "comment": "",
+        "key": "~6",
+        "location": {
+          "startingColumn": 54,
+          "startingLine": 513
+        }
+      },
+      {
+        "comment": "",
+        "key": "~12",
+        "location": {
+          "startingColumn": 81,
+          "startingLine": 513
+        }
+      },
+      {
+        "comment": "",
+        "key": "~18",
+        "location": {
+          "startingColumn": 89,
+          "startingLine": 513
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cerrar",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 559
+        }
+      },
+      {
+        "comment": "",
+        "key": "Generar",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 567
+        }
+      },
+      {
+        "comment": "",
+        "key": "Revisar y guardar",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 729
+        }
+      },
+      {
+        "comment": "",
+        "key": "Abierta",
+        "location": {
+          "startingColumn": 63,
+          "startingLine": 701
+        }
+      },
+      {
+        "comment": "",
+        "key": "Opción múltiple",
+        "location": {
+          "startingColumn": 75,
+          "startingLine": 701
+        }
+      },
+      {
+        "comment": "",
+        "key": "Incluir",
+        "location": {
+          "startingColumn": 44,
+          "startingLine": 704
+        }
+      },
+      {
+        "comment": "",
+        "key": "Guardar todas",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 732
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pregunta",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 766
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pregunta",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 769
+        }
+      },
+      {
+        "comment": "",
+        "key": "Respuesta",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 773
+        }
+      },
+      {
+        "comment": "",
+        "key": "Respuesta",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 776
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tags (coma)",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 778
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pregunta",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 792
+        }
+      },
+      {
+        "comment": "",
+        "key": "Respuesta",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 794
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tags (coma)",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 796
+        }
+      }
+    ]
+  },
+  "version": 1
+}

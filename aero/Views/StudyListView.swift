@@ -4,6 +4,19 @@ import SwiftData
 struct StudyListView: View {
     @StateObject private var viewModel = StudyListViewModel()
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
+    private var contentWidth: CGFloat {
+        isLargeCanvas ? AeroAdaptiveLayout.maxRegularContentWidth : AeroAdaptiveLayout.maxCompactContentWidth
+    }
+
+    private var studyGrid: [GridItem] {
+        if isLargeCanvas {
+            return [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
+        }
+        return [GridItem(.flexible())]
+    }
 
     var body: some View {
         NavigationStack {
@@ -22,15 +35,15 @@ struct StudyListView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: 0) {
-                            StudyStatsBanner(count: viewModel.rows.count)
-                                .padding(.horizontal, 16)
+                            StudyStatsBanner(count: viewModel.rows.count, isLargeCanvas: isLargeCanvas)
+                                .padding(.horizontal, isLargeCanvas ? 24 : 16)
                                 .padding(.top, 8)
                                 .padding(.bottom, 16)
 
-                            LazyVStack(spacing: 12) {
+                            LazyVGrid(columns: studyGrid, spacing: 12) {
                                 ForEach(viewModel.rows) { row in
                                     NavigationLink(destination: StudyDetailView(study: row.study)) {
-                                        StudyCardView(row: row)
+                                        StudyCardView(row: row, isLargeCanvas: isLargeCanvas)
                                     }
                                     .buttonStyle(.plain)
                                     .contextMenu {
@@ -49,9 +62,11 @@ struct StudyListView: View {
                                     }
                                 }
                             }
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, isLargeCanvas ? 24 : 16)
                             .padding(.bottom, 30)
                         }
+                        .frame(maxWidth: contentWidth)
+                        .frame(maxWidth: .infinity, alignment: .center)
                     }
                 }
             }
@@ -85,16 +100,17 @@ struct StudyListView: View {
 
 struct StudyStatsBanner: View {
     let count: Int
+    let isLargeCanvas: Bool
 
     var body: some View {
         AeroSurfaceCard {
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("¡A estudiar!")
-                        .font(.headline)
+                        .font(isLargeCanvas ? .title3 : .headline)
                         .fontWeight(.bold)
                     Text("\(count) tema\(count == 1 ? "" : "s") activo\(count == 1 ? "" : "s")")
-                        .font(.subheadline)
+                        .font(isLargeCanvas ? .body : .subheadline)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -120,6 +136,7 @@ struct StudyStatsBanner: View {
 
 struct StudyCardView: View {
     let row: StudyRowModel
+    let isLargeCanvas: Bool
 
     var body: some View {
         AeroSurfaceCard {
@@ -136,7 +153,7 @@ struct StudyCardView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Text(row.study.title)
-                            .font(.headline)
+                            .font(isLargeCanvas ? .title3 : .headline)
                             .foregroundStyle(.primary)
                         Spacer()
                         Image(systemName: "chevron.right")
@@ -145,7 +162,7 @@ struct StudyCardView: View {
                     }
 
                     Text(row.study.desc)
-                        .font(.subheadline)
+                        .font(isLargeCanvas ? .body : .subheadline)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
 
@@ -214,6 +231,12 @@ struct StudyCardView: View {
 
 struct EmptyStudiesView: View {
     let action: () -> Void
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
+    private var contentWidth: CGFloat {
+        isLargeCanvas ? AeroAdaptiveLayout.maxRegularContentWidth : AeroAdaptiveLayout.maxCompactContentWidth
+    }
 
     var body: some View {
         AeroSurfaceCard {
@@ -236,10 +259,10 @@ struct EmptyStudiesView: View {
 
                 VStack(spacing: 8) {
                     Text("Empieza tu primer estudio")
-                        .font(.title3)
+                        .font(isLargeCanvas ? .title2 : .title3)
                         .fontWeight(.bold)
                     Text("Crea un tema, agrega recursos y deja que\nla IA genere tus flashcards.")
-                        .font(.subheadline)
+                        .font(isLargeCanvas ? .body : .subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
@@ -251,7 +274,8 @@ struct EmptyStudiesView: View {
                 .buttonStyle(AeroPrimaryButtonStyle())
             }
         }
-        .padding(.horizontal, 40)
+        .frame(maxWidth: contentWidth)
+        .padding(.horizontal, isLargeCanvas ? 24 : 40)
         .padding(.vertical, 20)
     }
 }
@@ -261,6 +285,12 @@ struct EmptyStudiesView: View {
 struct CreateStudyView: View {
     @ObservedObject var viewModel: StudyListViewModel
     @Environment(\.dismiss) var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
+    private var contentWidth: CGFloat {
+        isLargeCanvas ? AeroAdaptiveLayout.maxRegularContentWidth : AeroAdaptiveLayout.maxCompactContentWidth
+    }
 
     var body: some View {
         NavigationStack {
@@ -277,14 +307,14 @@ struct CreateStudyView: View {
                             .font(.system(size: 34))
                             .foregroundColor(.white)
                         Text("Nuevo Estudio")
-                            .font(.title3)
+                            .font(isLargeCanvas ? .title2 : .title3)
                             .fontWeight(.bold)
-                            .foregroundColor(.white)
+                            .foregroundStyle(.white)
                         Text("Dale un nombre y descripción a tu tema.")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.8))
+                            .font(isLargeCanvas ? .body : .caption)
+                            .foregroundStyle(.white.opacity(0.8))
                     }
-                    .padding(.vertical, 28)
+                    .padding(.vertical, isLargeCanvas ? 34 : 28)
                 }
                 .frame(maxWidth: .infinity)
 
@@ -305,6 +335,8 @@ struct CreateStudyView: View {
                         Text("Información del estudio")
                     }
                 }
+                .frame(maxWidth: contentWidth)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -332,7 +364,7 @@ struct CreateStudyView: View {
 }
 
 #Preview("Banner stats") {
-    StudyStatsBanner(count: 5).padding()
+    StudyStatsBanner(count: 5, isLargeCanvas: false).padding()
 }
 
 #Preview("Estudios vacíos") {

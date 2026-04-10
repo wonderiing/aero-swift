@@ -1,0 +1,23 @@
+{
+  "/Users/Alumno/Desktop/hackathon/aero/aero/Services/IntelligentStudyAssistant.swift" : {
+    "const-values" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/IntelligentStudyAssistant.swiftconstvalues",
+    "dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/IntelligentStudyAssistant.d",
+    "diagnostics" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/IntelligentStudyAssistant.dia",
+    "object" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/IntelligentStudyAssistant.o",
+    "swift-dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/IntelligentStudyAssistant.swiftdeps"
+  },
+  "/Users/Alumno/Desktop/hackathon/aero/aero/Services/SpeechInputController.swift" : {
+    "const-values" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/SpeechInputController.swiftconstvalues",
+    "dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/SpeechInputController.d",
+    "diagnostics" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/SpeechInputController.dia",
+    "object" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/SpeechInputController.o",
+    "swift-dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/SpeechInputController.swiftdeps"
+  },
+  "/Users/Alumno/Desktop/hackathon/aero/aero/ViewModels/PracticeSessionViewModel.swift" : {
+    "const-values" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/PracticeSessionViewModel.swiftconstvalues",
+    "dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/PracticeSessionViewModel.d",
+    "diagnostics" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/PracticeSessionViewModel.dia",
+    "object" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/PracticeSessionViewModel.o",
+    "swift-dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/PracticeSessionViewModel.swiftdeps"
+  }
+}

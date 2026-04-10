@@ -152,11 +152,14 @@ enum IntelligentStudyAssistant {
         totalChunks: Int
     ) async throws -> [EditableFlashcard] {
         let instructions = Instructions {
-            "Eres un profesor experto que crea flashcards pedagógicas en español."
-            "Usa únicamente información del material proporcionado. No inventes datos."
-            "Mezcla tipos: aproximadamente 60% open, 40% multiple_choice."
-            "IMPORTANTE: Varía los estilos de pregunta. Usa comparaciones, causa-efecto, aplicación práctica, procesos, clasificación y relación entre conceptos. NO repitas '¿Qué es X?' más de 1 vez. Cada pregunta debe tener un enfoque diferente."
-            "sourceResourceTitle debe ser una copia exacta del título del recurso."
+            "Eres un docente experto en diseño instruccional. Tu objetivo es crear flashcards que desarrollen comprensión profunda, no memorización superficial."
+            "REGLAS DE CALIDAD:"
+            "1. Basa cada pregunta en una idea central del material. Si la idea no está en el texto, no la uses."
+            "2. Las preguntas abiertas ('open') deben pedir al estudiante que explique, relacione, compare, aplique o prediga. Nunca preguntar solo definiciones."
+            "3. Las preguntas de opción múltiple ('multiple_choice') deben tener distractores que representen confusiones reales, no opciones absurdas."
+            "4. La respuesta modelo debe ser didáctica: incluye el 'por qué' o el mecanismo, no solo el dato."
+            "OBLIGATORIO: mezcla cardKind. Al menos el 50% deben ser 'open'. Alterna explícitamente entre tipos; nunca generes solo 'multiple_choice'."
+            "sourceResourceTitle debe ser copia exacta del título del recurso en la lista RECURSOS."
         }
 
         let session = LanguageModelSession(instructions: instructions)
@@ -342,9 +345,15 @@ enum IntelligentStudyAssistant {
         }
 
         let instructions = Instructions {
-            "Eres un tutor que evalúa respuestas de estudio en español."
-            "Sé justo: respuestas parafraseadas correctas deben marcar isCorrect true."
-            "errorTypeToken vacío si isCorrect; si no: conceptual, memoria, confusion o incompleto."
+            "Eres un tutor benevolente que evalúa respuestas de estudio en español."
+            "PRINCIPIO FUNDAMENTAL: evalúas si el estudiante COMPRENDE el concepto, no si memorizó la redacción exacta."
+            "REGLA isCorrect=true: cualquier respuesta que demuestre comprensión del concepto central, aunque sea breve, incompleta, informal o parafraseada. En caso de duda, marca isCorrect=true."
+            "REGLA isCorrect=false: SOLO si la respuesta contiene un error conceptual activo (afirma algo incorrecto) o es completamente irrelevante a la pregunta. Una respuesta corta o superficial NO es incorrecta."
+            "JERARQUÍA DE EVALUACIÓN:"
+            "1. ¿La respuesta afirma algo claramente erróneo? → isCorrect=false, errorTypeToken=conceptual o confusion."
+            "2. ¿La respuesta es correcta pero le faltan ideas clave? → isCorrect=true, errorTypeToken=incompleto, lista missingConcepts."
+            "3. ¿La respuesta es correcta y completa? → isCorrect=true, errorTypeToken vacío."
+            "El feedback siempre debe ser constructivo y en español. Si es correcto, refuerza lo que hizo bien. Si es incompleto, explica qué faltó. Si es incorrecto, corrige con amabilidad."
         }
 
         let session = LanguageModelSession(instructions: instructions)
@@ -372,7 +381,7 @@ enum IntelligentStudyAssistant {
             let ev = response.content
 
             let errToken = ev.errorTypeToken.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            let mappedError: ErrorType? = ev.isCorrect ? nil : ErrorType(rawValue: errToken)
+            let mappedError: ErrorType? = errToken.isEmpty ? nil : ErrorType(rawValue: errToken)
 
             return CreateAttemptDto(
                 userAnswer: userAnswer,

@@ -5,9 +5,15 @@ struct ResourceDetailView: View {
     let resource: SDResource
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var title: String = ""
     @State private var content: String = ""
     @State private var errorMessage: String?
+
+    private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
+    private var contentWidth: CGFloat {
+        isLargeCanvas ? AeroAdaptiveLayout.maxRegularContentWidth : AeroAdaptiveLayout.maxCompactContentWidth
+    }
 
     var body: some View {
         ZStack {
@@ -29,9 +35,9 @@ struct ResourceDetailView: View {
                             Label("Contenido", systemImage: "doc.text")
                                 .font(.headline)
                             TextEditor(text: $content)
-                                .frame(minHeight: 240)
+                                .frame(minHeight: isLargeCanvas ? 360 : 240)
                                 .padding(8)
-                                .background(Color(uiColor: .systemBackground).opacity(0.55))
+                                .background(Color.aeroSecondaryBackground.opacity(0.8))
                                 .clipShape(.rect(cornerRadius: 12))
                         }
                     }
@@ -49,8 +55,10 @@ struct ResourceDetailView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, isLargeCanvas ? 24 : 16)
                 .padding(.vertical, 14)
+                .frame(maxWidth: contentWidth)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
         }
         .navigationTitle("Recurso")

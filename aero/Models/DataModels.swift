@@ -182,14 +182,19 @@ final class SDAttempt {
 struct GapAnalysis {
     let studyId: UUID
     let totalAttempts: Int
+    let errorTypeBreakdown: [(type: ErrorType, count: Int)]
     let gaps: [ConceptGap]
     let strongConcepts: [StrongConcept]
 
     static func compute(flashcards: [SDFlashcard]) -> GapAnalysis {
         var conceptStats: [String: (total: Int, errors: Int, lastSeen: Date?, errorTypes: [ErrorType])] = [:]
+        var errorTypeCounts: [ErrorType: Int] = [:]
 
         for card in flashcards {
             for attempt in card.attempts {
+                if !attempt.isCorrect, let et = attempt.errorType {
+                    errorTypeCounts[et, default: 0] += 1
+                }
                 for tag in card.conceptTags {
                     let key = tag.lowercased()
                     var stat = conceptStats[key] ?? (0, 0, nil, [])
@@ -236,9 +241,14 @@ struct GapAnalysis {
         gaps.sort { $0.error_rate > $1.error_rate }
         strong.sort { $0.error_rate < $1.error_rate }
 
+        let breakdown = errorTypeCounts
+            .sorted { $0.value > $1.value }
+            .map { (type: $0.key, count: $0.value) }
+
         return GapAnalysis(
             studyId: flashcards.first?.study?.id ?? UUID(),
             totalAttempts: totalAttempts,
+            errorTypeBreakdown: breakdown,
             gaps: gaps,
             strongConcepts: strong
         )

@@ -1,0 +1,176 @@
+{
+  "source": "/Users/Alumno/Desktop/hackathon/aero/aero/Views/StudyListView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Mis Estudios",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 73
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cargando estudios...",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 29
+        }
+      },
+      {
+        "comment": "",
+        "key": "Eliminar estudio",
+        "location": {
+          "startingColumn": 51,
+          "startingLine": 53
+        }
+      },
+      {
+        "comment": "",
+        "key": "Eliminar",
+        "location": {
+          "startingColumn": 51,
+          "startingLine": 60
+        }
+      },
+      {
+        "comment": "",
+        "key": "¡A estudiar!",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 109
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld tema%@ activo%@",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 112
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 125
+        }
+      },
+      {
+        "comment": "",
+        "key": "Precisión",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 173
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 177
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld pendiente%@",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 189
+        }
+      },
+      {
+        "comment": "",
+        "key": "Al día",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 200
+        }
+      },
+      {
+        "comment": "",
+        "key": "Empieza tu primer estudio",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 261
+        }
+      },
+      {
+        "comment": "",
+        "key": "Crea un tema, agrega recursos y deja que\nla IA genere tus flashcards.",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 264
+        }
+      },
+      {
+        "comment": "",
+        "key": "Crear primer estudio",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 271
+        }
+      },
+      {
+        "comment": "",
+        "key": "Nuevo Estudio",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 309
+        }
+      },
+      {
+        "comment": "",
+        "key": "Dale un nombre y descripción a tu tema.",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 313
+        }
+      },
+      {
+        "comment": "",
+        "key": "Título (ej: Biología Celular)",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 323
+        }
+      },
+      {
+        "comment": "",
+        "key": "Describe el tema de estudio...",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 326
+        }
+      },
+      {
+        "comment": "",
+        "key": "Información del estudio",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 335
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancelar",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 344
+        }
+      },
+      {
+        "comment": "",
+        "key": "Crear",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 350
+        }
+      }
+    ]
+  },
+  "version": 1
+}

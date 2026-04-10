@@ -3,6 +3,43 @@ import FoundationModels
 
 // MARK: - UI Building Blocks
 
+private enum AeroLayout {
+    static let maxContentWidthCompact: CGFloat = 560
+    static let maxContentWidthRegular: CGFloat = 860
+    static let cardCornerRadius: CGFloat = 18
+}
+
+fileprivate struct AeroTypeScale {
+    let title: Font
+    let sectionHeader: Font
+    let body: Font
+    let secondary: Font
+    let pill: Font
+    let editorLabel: Font
+
+    static func make(isLargeCanvas: Bool) -> AeroTypeScale {
+        if isLargeCanvas {
+            return AeroTypeScale(
+                title: .title2,
+                sectionHeader: .title3.weight(.semibold),
+                body: .body,
+                secondary: .callout,
+                pill: .callout.weight(.semibold),
+                editorLabel: .callout.weight(.semibold)
+            )
+        } else {
+            return AeroTypeScale(
+                title: .headline,
+                sectionHeader: .headline,
+                body: .body,
+                secondary: .caption,
+                pill: .caption.weight(.semibold),
+                editorLabel: .caption.weight(.semibold)
+            )
+        }
+    }
+}
+
 private struct AeroBackground: View {
     var body: some View {
         ZStack {
@@ -10,7 +47,7 @@ private struct AeroBackground: View {
                 colors: [
                     Color.indigo.opacity(0.18),
                     Color.purple.opacity(0.10),
-                    Color(uiColor: .systemGroupedBackground)
+                    .aeroGroupedBackground
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -35,17 +72,22 @@ private struct AeroBackground: View {
 
 private struct AeroCard<Content: View>: View {
     let content: Content
-    init(@ViewBuilder content: () -> Content) { self.content = content() }
+    let isLargeCanvas: Bool
+
+    init(isLargeCanvas: Bool = false, @ViewBuilder content: () -> Content) {
+        self.content = content()
+        self.isLargeCanvas = isLargeCanvas
+    }
 
     var body: some View {
         content
-            .padding(.vertical, 10)
-            .padding(.horizontal, 12)
+            .padding(.vertical, isLargeCanvas ? 14 : 10)
+            .padding(.horizontal, isLargeCanvas ? 16 : 12)
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: AeroLayout.cardCornerRadius, style: .continuous)
                     .fill(.ultraThinMaterial)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        RoundedRectangle(cornerRadius: AeroLayout.cardCornerRadius, style: .continuous)
                             .strokeBorder(Color.white.opacity(0.22), lineWidth: 1)
                     )
                     .shadow(color: .black.opacity(0.06), radius: 16, y: 8)
@@ -57,17 +99,19 @@ private struct SectionHeader<Trailing: View>: View {
     let title: String
     let systemImage: String
     @ViewBuilder var trailing: () -> Trailing
+    let typeScale: AeroTypeScale
 
-    init(_ title: String, systemImage: String, @ViewBuilder trailing: @escaping () -> Trailing) {
+    init(_ title: String, systemImage: String, typeScale: AeroTypeScale, @ViewBuilder trailing: @escaping () -> Trailing) {
         self.title = title
         self.systemImage = systemImage
+        self.typeScale = typeScale
         self.trailing = trailing
     }
 
     var body: some View {
         HStack(spacing: 10) {
             Label(title, systemImage: systemImage)
-                .font(.headline)
+                .font(typeScale.sectionHeader)
                 .labelStyle(.titleAndIcon)
                 .symbolRenderingMode(.hierarchical)
 
@@ -84,10 +128,10 @@ private struct SectionHeader<Trailing: View>: View {
 
 private struct CountPill: View {
     let count: Int
+    let typeScale: AeroTypeScale
     var body: some View {
         Text("\(count) seleccionado\(count == 1 ? "" : "s")")
-            .font(.caption)
-            .fontWeight(.semibold)
+            .font(typeScale.pill)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(.thinMaterial, in: Capsule())
@@ -100,13 +144,15 @@ private struct ResourceSelectionRow: View {
     let title: String
     let preview: String
     @Binding var isSelected: Bool
+    let typeScale: AeroTypeScale
+    let isLargeCanvas: Bool
 
     @State private var highlight = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                .font(.title3)
+                .font(typeScale.sectionHeader)
                 .foregroundStyle(isSelected ? Color.indigo : Color.secondary)
                 .symbolRenderingMode(.hierarchical)
                 .contentTransition(.symbolEffect(.replace))
@@ -114,12 +160,12 @@ private struct ResourceSelectionRow: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
-                    .font(.headline)
+                    .font(typeScale.body.weight(.semibold))
                     .lineLimit(2)
                     .minimumScaleFactor(0.95)
 
                 Text(preview)
-                    .font(.caption)
+                    .font(typeScale.secondary)
                     .foregroundStyle(.secondary)
                     .lineLimit(3)
             }
@@ -130,9 +176,10 @@ private struct ResourceSelectionRow: View {
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .tint(.indigo)
+                .controlSize(isLargeCanvas ? .large : .regular)
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
+        .padding(.vertical, isLargeCanvas ? 10 : 6)
+        .padding(.horizontal, isLargeCanvas ? 14 : 10)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(isSelected ? Color.indigo.opacity(0.08) : Color.clear)
@@ -161,9 +208,10 @@ private struct ResourceSelectionRow: View {
 
 // MARK: - Generation Progress Overlay
 
-struct GenerationProgressOverlay: View {
+fileprivate struct GenerationProgressOverlay: View {
     let progress: CGFloat
     let statusText: String
+    let typeScale: AeroTypeScale
 
     @State private var pulse = false
 
@@ -215,7 +263,7 @@ struct GenerationProgressOverlay: View {
 
             VStack(spacing: 10) {
                 Text(statusText)
-                    .font(.headline)
+                    .font(typeScale.sectionHeader)
                     .contentTransition(.numericText())
                     .animation(.easeInOut(duration: 0.3), value: statusText)
 
@@ -237,9 +285,8 @@ struct GenerationProgressOverlay: View {
                 .frame(maxWidth: 220)
 
                 Text("\(Int(progress * 100))%")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
+                    .font(typeScale.pill)
+                    .foregroundStyle(.secondary)
                     .contentTransition(.numericText())
             }
         }
@@ -262,6 +309,7 @@ struct GenerationProgressOverlay: View {
 struct GenerateFlashcardsSheet: View {
     @ObservedObject var viewModel: StudyDetailViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var selectedIds: Set<UUID> = []
     @State private var depth: IntelligentStudyAssistant.Depth = .medium
@@ -280,6 +328,24 @@ struct GenerateFlashcardsSheet: View {
         return aiOk && !selectedIds.isEmpty && !isGenerating
     }
 
+    private var isLargeCanvas: Bool {
+        #if os(macOS)
+        return true
+        #else
+        return UIDevice.current.userInterfaceIdiom == .pad || horizontalSizeClass == .regular
+        #endif
+    }
+
+    private var typeScale: AeroTypeScale { .make(isLargeCanvas: isLargeCanvas) }
+
+    private var maxContentWidth: CGFloat {
+        isLargeCanvas ? AeroLayout.maxContentWidthRegular : AeroLayout.maxContentWidthCompact
+    }
+
+    private var resourcePreviewLength: Int {
+        isLargeCanvas ? 200 : 120
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -287,25 +353,24 @@ struct GenerateFlashcardsSheet: View {
 
                 List {
                     Section {
-                        AeroCard {
+                        AeroCard(isLargeCanvas: isLargeCanvas) {
                             if IntelligentStudyAssistant.isAppleIntelligenceReady {
                                 HStack(alignment: .center, spacing: 12) {
                                     Image(systemName: "apple.intelligence")
-                                        .font(.title3)
+                                        .font(typeScale.sectionHeader)
                                         .foregroundStyle(
                                             LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
                                         )
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("Apple Intelligence activa")
-                                            .font(.headline)
+                                            .font(typeScale.sectionHeader)
                                         Text("Generación on-device (más rápida y privada).")
-                                            .font(.caption)
+                                            .font(typeScale.secondary)
                                             .foregroundStyle(.secondary)
                                     }
                                     Spacer(minLength: 8)
                                     Text("OK")
-                                        .font(.caption)
-                                        .fontWeight(.semibold)
+                                        .font(typeScale.pill)
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 6)
                                         .background(Color.green.opacity(0.14), in: Capsule())
@@ -316,17 +381,17 @@ struct GenerateFlashcardsSheet: View {
                                     let reason = IntelligentStudyAssistant.unavailabilityReason
                                     if reason == .modelNotReady {
                                         Label("Modelo descargándose…", systemImage: "arrow.down.circle")
-                                            .font(.headline)
+                                            .font(typeScale.sectionHeader)
                                             .foregroundStyle(.orange)
                                         Text("Ve a Ajustes → Apple Intelligence y Siri y espera a que termine. En simulador, la descarga ocurre en tu Mac host (requiere Apple Silicon).")
-                                            .font(.caption)
+                                            .font(typeScale.secondary)
                                             .foregroundStyle(.secondary)
                                     } else {
                                         Label("Apple Intelligence no disponible", systemImage: "exclamationmark.triangle.fill")
-                                            .font(.headline)
+                                            .font(typeScale.sectionHeader)
                                             .foregroundStyle(.red)
                                         Text(IntelligentStudyAssistant.unavailabilityReasonDescription())
-                                            .font(.caption)
+                                            .font(typeScale.secondary)
                                             .foregroundStyle(.secondary)
                                     }
                                 }
@@ -335,24 +400,25 @@ struct GenerateFlashcardsSheet: View {
                         .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                         .listRowBackground(Color.clear)
                     } header: {
-                        SectionHeader("Motor de IA", systemImage: "cpu") { EmptyView() }
+                        SectionHeader("Motor de IA", systemImage: "cpu", typeScale: typeScale) { EmptyView() }
                     }
 
                     Section {
-                        AeroCard {
+                        AeroCard(isLargeCanvas: isLargeCanvas) {
                             HStack(alignment: .center, spacing: 12) {
                                 Image(systemName: "slider.horizontal.3")
-                                    .font(.title3)
+                                    .font(typeScale.sectionHeader)
                                     .foregroundStyle(.secondary)
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text("Cantidad orientativa")
-                                        .font(.headline)
+                                        .font(typeScale.sectionHeader)
                                     Picker("Cantidad", selection: $depth) {
                                         Text("Pocas").tag(IntelligentStudyAssistant.Depth.low)
                                         Text("Media").tag(IntelligentStudyAssistant.Depth.medium)
                                         Text("Muchas").tag(IntelligentStudyAssistant.Depth.high)
                                     }
                                     .pickerStyle(.segmented)
+                                    .controlSize(isLargeCanvas ? .large : .regular)
                                 }
                             }
                         }
@@ -360,16 +426,17 @@ struct GenerateFlashcardsSheet: View {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                     } header: {
-                        SectionHeader("Ajustes", systemImage: "gearshape") { EmptyView() }
+                        SectionHeader("Ajustes", systemImage: "gearshape", typeScale: typeScale) { EmptyView() }
                     } footer: {
                         Text(depth == .low ? "Ideal para un repaso rápido." : (depth == .medium ? "Equilibrado para estudiar." : "Más cobertura, tarda un poco más."))
+                            .font(typeScale.secondary)
                     }
 
                     Section {
                         ForEach(viewModel.resources) { r in
                             ResourceSelectionRow(
                                 title: r.title,
-                                preview: String(r.content.prefix(120)) + (r.content.count > 120 ? "…" : ""),
+                                preview: String(r.content.prefix(resourcePreviewLength)) + (r.content.count > resourcePreviewLength ? "…" : ""),
                                 isSelected: Binding(
                                     get: { selectedIds.contains(r.id) },
                                     set: { on in
@@ -377,32 +444,35 @@ struct GenerateFlashcardsSheet: View {
                                             if on { selectedIds.insert(r.id) } else { selectedIds.remove(r.id) }
                                         }
                                     }
-                                )
+                                ),
+                                typeScale: typeScale,
+                                isLargeCanvas: isLargeCanvas
                             )
                             .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                         }
                     } header: {
-                        SectionHeader("Recursos", systemImage: "books.vertical") {
-                            CountPill(count: selectedIds.count)
+                        SectionHeader("Recursos", systemImage: "books.vertical", typeScale: typeScale) {
+                            CountPill(count: selectedIds.count, typeScale: typeScale)
                         }
                     } footer: {
                         Text("Selecciona 1 o más recursos. Cuanto mejor sea el texto, mejores serán las tarjetas.")
+                            .font(typeScale.secondary)
                     }
 
                     if let generationError {
                         Section {
-                            AeroCard {
+                            AeroCard(isLargeCanvas: isLargeCanvas) {
                                 HStack(alignment: .top, spacing: 12) {
                                     Image(systemName: "xmark.octagon.fill")
                                         .foregroundStyle(.red)
-                                        .font(.title3)
+                                        .font(typeScale.sectionHeader)
                                     VStack(alignment: .leading, spacing: 6) {
                                         Text("No se pudo generar")
-                                            .font(.headline)
+                                            .font(typeScale.sectionHeader)
                                         Text(generationError)
-                                            .font(.caption)
+                                            .font(typeScale.secondary)
                                             .foregroundStyle(.secondary)
                                     }
                                     Spacer()
@@ -416,6 +486,8 @@ struct GenerateFlashcardsSheet: View {
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
+                .frame(maxWidth: maxContentWidth)
+                .frame(maxWidth: .infinity, alignment: .center)
                 .overlay {
                     if viewModel.resources.isEmpty {
                         ContentUnavailableView(
@@ -439,7 +511,7 @@ struct GenerateFlashcardsSheet: View {
                                     .fontWeight(.semibold)
                                 Spacer()
                                 Text(depth == .low ? "~6" : (depth == .medium ? "~12" : "~18"))
-                                    .font(.caption)
+                                    .font(typeScale.secondary)
                                     .foregroundStyle(.secondary)
                             }
                             .padding(.horizontal, 14)
@@ -452,11 +524,14 @@ struct GenerateFlashcardsSheet: View {
                             .shadow(color: canGenerate ? .purple.opacity(0.25) : .clear, radius: 16, y: 8)
                         }
                         .disabled(!canGenerate)
+                        .controlSize(isLargeCanvas ? .large : .regular)
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, isLargeCanvas ? 24 : 16)
                     .padding(.top, 10)
                     .padding(.bottom, 10)
                     .background(.ultraThinMaterial)
+                    .frame(maxWidth: maxContentWidth)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
                 .allowsHitTesting(!isGenerating)
                 .blur(radius: isGenerating ? 4 : 0)
@@ -470,13 +545,14 @@ struct GenerateFlashcardsSheet: View {
 
                     GenerationProgressOverlay(
                         progress: generationProgress,
-                        statusText: generationStatus
+                        statusText: generationStatus,
+                        typeScale: typeScale
                     )
                     .transition(.scale(scale: 0.85).combined(with: .opacity))
                 }
             }
             .navigationTitle("Generar flashcards")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(isLargeCanvas ? .automatic : .inline)
             .onAppear { IntelligentStudyAssistant.prewarm() }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -567,9 +643,24 @@ struct ReviewGeneratedFlashcardsView: View {
     @ObservedObject var viewModel: StudyDetailViewModel
     @Binding var drafts: [EditableFlashcard]
     var onFinish: () -> Void
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var isSaving = false
     @State private var errorMessage: String?
+
+    private var isLargeCanvas: Bool {
+        #if os(macOS)
+        return true
+        #else
+        return UIDevice.current.userInterfaceIdiom == .pad || horizontalSizeClass == .regular
+        #endif
+    }
+
+    private var typeScale: AeroTypeScale { .make(isLargeCanvas: isLargeCanvas) }
+
+    private var maxContentWidth: CGFloat {
+        isLargeCanvas ? AeroLayout.maxContentWidthRegular : AeroLayout.maxContentWidthCompact
+    }
 
     var body: some View {
         ZStack {
@@ -578,14 +669,14 @@ struct ReviewGeneratedFlashcardsView: View {
             List {
                 if let errorMessage {
                     Section {
-                        AeroCard {
+                        AeroCard(isLargeCanvas: isLargeCanvas) {
                             HStack(alignment: .top, spacing: 12) {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .foregroundStyle(.red)
-                                    .font(.title3)
+                                    .font(typeScale.sectionHeader)
                                     .accessibilityHidden(true)
                                 Text(errorMessage)
-                                    .font(.caption)
+                                    .font(typeScale.secondary)
                                     .foregroundStyle(.secondary)
                                 Spacer()
                             }
@@ -598,7 +689,7 @@ struct ReviewGeneratedFlashcardsView: View {
 
                 ForEach($drafts) { $card in
                     Section {
-                        AeroCard {
+                        AeroCard(isLargeCanvas: isLargeCanvas) {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack(spacing: 10) {
                                     Image(systemName: card.type == .open ? "text.bubble" : "list.bullet.circle")
@@ -608,31 +699,19 @@ struct ReviewGeneratedFlashcardsView: View {
                                         .symbolRenderingMode(.hierarchical)
                                         .accessibilityHidden(true)
                                     Text(card.type == .open ? "Abierta" : "Opción múltiple")
-                                        .font(.headline)
+                                        .font(typeScale.sectionHeader)
                                     Spacer()
                                     Toggle("Incluir", isOn: $card.isIncluded)
                                         .labelsHidden()
                                         .tint(.indigo)
+                                        .controlSize(isLargeCanvas ? .large : .regular)
                                 }
 
-                                VStack(alignment: .leading, spacing: 10) {
-                                    TextField("Pregunta", text: $card.question, axis: .vertical)
-                                        .textFieldStyle(.roundedBorder)
-
-                                    TextField("Respuesta", text: $card.answer, axis: .vertical)
-                                        .textFieldStyle(.roundedBorder)
-
-                                    TextField("Tags (coma)", text: Binding(
-                                        get: { card.conceptTags.joined(separator: ", ") },
-                                        set: {
-                                            card.conceptTags = $0
-                                                .split(separator: ",")
-                                                .map { $0.trimmingCharacters(in: .whitespaces) }
-                                                .filter { !$0.isEmpty }
-                                        }
-                                    ))
-                                    .textFieldStyle(.roundedBorder)
-                                }
+                                FlashcardEditorFields(
+                                    card: $card,
+                                    typeScale: typeScale,
+                                    isLargeCanvas: isLargeCanvas
+                                )
                             }
                         }
                         .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
@@ -644,6 +723,8 @@ struct ReviewGeneratedFlashcardsView: View {
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
+            .frame(maxWidth: maxContentWidth)
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .navigationTitle("Revisar y guardar")
         .toolbar {
@@ -652,6 +733,7 @@ struct ReviewGeneratedFlashcardsView: View {
                     saveBatch()
                 }
                 .disabled(isSaving)
+                .controlSize(isLargeCanvas ? .large : .regular)
             }
         }
     }
@@ -671,6 +753,62 @@ struct ReviewGeneratedFlashcardsView: View {
     }
 }
 
+private struct FlashcardEditorFields: View {
+    @Binding var card: EditableFlashcard
+    let typeScale: AeroTypeScale
+    let isLargeCanvas: Bool
+
+    var body: some View {
+        Group {
+            if isLargeCanvas {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Pregunta")
+                            .font(typeScale.editorLabel)
+                            .foregroundStyle(.secondary)
+                        TextField("Pregunta", text: $card.question, axis: .vertical)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Respuesta")
+                            .font(typeScale.editorLabel)
+                            .foregroundStyle(.secondary)
+                        TextField("Respuesta", text: $card.answer, axis: .vertical)
+                            .textFieldStyle(.roundedBorder)
+                        TextField("Tags (coma)", text: Binding(
+                            get: { card.conceptTags.joined(separator: ", ") },
+                            set: {
+                                card.conceptTags = $0
+                                    .split(separator: ",")
+                                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                                    .filter { !$0.isEmpty }
+                            }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    TextField("Pregunta", text: $card.question, axis: .vertical)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("Respuesta", text: $card.answer, axis: .vertical)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("Tags (coma)", text: Binding(
+                        get: { card.conceptTags.joined(separator: ", ") },
+                        set: {
+                            card.conceptTags = $0
+                                .split(separator: ",")
+                                .map { $0.trimmingCharacters(in: .whitespaces) }
+                                .filter { !$0.isEmpty }
+                        }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                }
+            }
+        }
+    }
+}
+
 #if DEBUG
 #Preview("Generar flashcards") {
     GenerateFlashcardsSheet(viewModel: StudyDetailViewModel.previewMock())
@@ -678,8 +816,12 @@ struct ReviewGeneratedFlashcardsView: View {
 
 #Preview("Progress overlay") {
     ZStack {
-        Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
-        GenerationProgressOverlay(progress: 0.65, statusText: "Generando parte 2 de 3...")
+        Color.aeroGroupedBackground.ignoresSafeArea()
+        GenerationProgressOverlay(
+            progress: 0.65,
+            statusText: "Generando parte 2 de 3...",
+            typeScale: .make(isLargeCanvas: true)
+        )
     }
 }
 

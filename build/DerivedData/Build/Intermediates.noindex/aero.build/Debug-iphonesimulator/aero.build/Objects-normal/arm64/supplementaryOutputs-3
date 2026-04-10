@@ -1,0 +1,23 @@
+{
+  "/Users/Alumno/Desktop/hackathon/aero/aero/Services/AIGenerationModels.swift" : {
+    "const-values" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/AIGenerationModels.swiftconstvalues",
+    "dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/AIGenerationModels.d",
+    "diagnostics" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/AIGenerationModels.dia",
+    "object" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/AIGenerationModels.o",
+    "swift-dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/AIGenerationModels.swiftdeps"
+  },
+  "/Users/Alumno/Desktop/hackathon/aero/aero/Services/AnswerEvaluationService.swift" : {
+    "const-values" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/AnswerEvaluationService.swiftconstvalues",
+    "dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/AnswerEvaluationService.d",
+    "diagnostics" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/AnswerEvaluationService.dia",
+    "object" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/AnswerEvaluationService.o",
+    "swift-dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/AnswerEvaluationService.swiftdeps"
+  },
+  "/Users/Alumno/Desktop/hackathon/aero/aero/Services/DocumentTextExtractor.swift" : {
+    "const-values" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/DocumentTextExtractor.swiftconstvalues",
+    "dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/DocumentTextExtractor.d",
+    "diagnostics" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/DocumentTextExtractor.dia",
+    "object" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/DocumentTextExtractor.o",
+    "swift-dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/DocumentTextExtractor.swiftdeps"
+  }
+}

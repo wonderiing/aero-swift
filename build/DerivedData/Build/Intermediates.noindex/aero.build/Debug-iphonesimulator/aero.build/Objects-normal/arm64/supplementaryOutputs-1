@@ -1,0 +1,23 @@
+{
+  "/Users/Alumno/Desktop/hackathon/aero/aero/Models/AttemptModels.swift" : {
+    "const-values" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/AttemptModels.swiftconstvalues",
+    "dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/AttemptModels.d",
+    "diagnostics" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/AttemptModels.dia",
+    "object" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/AttemptModels.o",
+    "swift-dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/AttemptModels.swiftdeps"
+  },
+  "/Users/Alumno/Desktop/hackathon/aero/aero/Models/DataModels.swift" : {
+    "const-values" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/DataModels.swiftconstvalues",
+    "dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/DataModels.d",
+    "diagnostics" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/DataModels.dia",
+    "object" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/DataModels.o",
+    "swift-dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/DataModels.swiftdeps"
+  },
+  "/Users/Alumno/Desktop/hackathon/aero/aero/Models/FlashcardModels.swift" : {
+    "const-values" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/FlashcardModels.swiftconstvalues",
+    "dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/FlashcardModels.d",
+    "diagnostics" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/FlashcardModels.dia",
+    "object" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/FlashcardModels.o",
+    "swift-dependencies" : "/Users/Alumno/Desktop/hackathon/aero/build/DerivedData/Build/Intermediates.noindex/aero.build/Debug-iphonesimulator/aero.build/Objects-normal/arm64/FlashcardModels.swiftdeps"
+  }
+}

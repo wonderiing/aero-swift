@@ -1,0 +1,416 @@
+{
+  "source": "/Users/Alumno/Desktop/hackathon/aero/aero/Views/StudyDetailView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 44
+        }
+      },
+      {
+        "comment": "",
+        "key": "Generar con IA",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 59
+        }
+      },
+      {
+        "comment": "",
+        "key": "Crear manualmente",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 66
+        }
+      },
+      {
+        "comment": "",
+        "key": "Practicar · %lld tarjeta%@",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 124
+        }
+      },
+      {
+        "comment": "",
+        "key": "Agrega apuntes o PDFs para que la IA genere flashcards automáticamente.",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 208
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sin recursos todavía",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 206
+        }
+      },
+      {
+        "comment": "",
+        "key": "Agregar recurso",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 214
+        }
+      },
+      {
+        "comment": "",
+        "key": "Genera tarjetas con IA a partir de tus recursos o crea una manualmente.",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 301
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sin flashcards todavía",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 299
+        }
+      },
+      {
+        "comment": "",
+        "key": "Con IA",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 308
+        }
+      },
+      {
+        "comment": "",
+        "key": "Manual",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 318
+        }
+      },
+      {
+        "comment": "",
+        "key": "Abierta",
+        "location": {
+          "startingColumn": 52,
+          "startingLine": 355
+        }
+      },
+      {
+        "comment": "",
+        "key": "Opción múltiple",
+        "location": {
+          "startingColumn": 64,
+          "startingLine": 355
+        }
+      },
+      {
+        "comment": "",
+        "key": "en %lldd",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 368
+        }
+      },
+      {
+        "comment": "",
+        "key": "#%@",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 399
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 449
+        }
+      },
+      {
+        "comment": "",
+        "key": "Precisión general",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 455
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld · %lld%%",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 478
+        }
+      },
+      {
+        "comment": "",
+        "key": "Analizando tu progreso...",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 513
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 558
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld errores de %lld intentos · %@",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 563
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error principal: %@",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 566
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld intentos · %lld%% error",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 588
+        }
+      },
+      {
+        "comment": "",
+        "key": "Agregar recurso",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 653
+        }
+      },
+      {
+        "comment": "",
+        "key": "Nuevo recurso",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 617
+        }
+      },
+      {
+        "comment": "",
+        "key": "Título",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 618
+        }
+      },
+      {
+        "comment": "",
+        "key": "Escribe tus notas aquí o pega el contenido extraído de un PDF...",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 621
+        }
+      },
+      {
+        "comment": "",
+        "key": "Importar PDF o imagen (OCR)",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 638
+        }
+      },
+      {
+        "comment": "",
+        "key": "El texto se extrae en el dispositivo con PDFKit o Vision; el servidor solo recibe texto plano.",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 643
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancelar",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 666
+        }
+      },
+      {
+        "comment": "",
+        "key": "Guardar",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 669
+        }
+      },
+      {
+        "comment": "",
+        "key": "Nueva Flashcard",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 813
+        }
+      },
+      {
+        "comment": "",
+        "key": "Primero agrega un recurso al estudio.",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 745
+        }
+      },
+      {
+        "comment": "",
+        "key": "Recurso",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 755
+        }
+      },
+      {
+        "comment": "",
+        "key": "Recurso asociado",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 765
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tipo",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 769
+        }
+      },
+      {
+        "comment": "",
+        "key": "Respuesta abierta",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 770
+        }
+      },
+      {
+        "comment": "",
+        "key": "Opción múltiple",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 771
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tipo de tarjeta",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 776
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pregunta",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 783
+        }
+      },
+      {
+        "comment": "",
+        "key": "Respuesta correcta",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 790
+        }
+      },
+      {
+        "comment": "",
+        "key": "Distractor 1 (obligatorio)",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 795
+        }
+      },
+      {
+        "comment": "",
+        "key": "Distractor 2",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 796
+        }
+      },
+      {
+        "comment": "",
+        "key": "Distractor 3",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 797
+        }
+      },
+      {
+        "comment": "",
+        "key": "Respuestas incorrectas",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 799
+        }
+      },
+      {
+        "comment": "",
+        "key": "Al menos un distractor es obligatorio para opción múltiple.",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 801
+        }
+      },
+      {
+        "comment": "",
+        "key": "fotosíntesis, cloroplasto, ...",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 806
+        }
+      },
+      {
+        "comment": "",
+        "key": "Etiquetas de concepto",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 808
+        }
+      },
+      {
+        "comment": "",
+        "key": "Opcional. Separa los conceptos con comas.",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 810
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancelar",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 819
+        }
+      },
+      {
+        "comment": "",
+        "key": "Guardar",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 828
+        }
+      }
+    ]
+  },
+  "version": 1
+}

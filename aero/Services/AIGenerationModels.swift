@@ -25,22 +25,29 @@ struct GeneratedFlashcardChunk {
 
 @Generable
 struct GeneratedFlashcardItem {
-    @Guide(description: "Pregunta variada en español. VARÍA el estilo entre: comparación (¿En qué se diferencia X de Y?), causa-efecto (¿Por qué ocurre X?), aplicación (¿Qué pasaría si…?), proceso (¿Cuáles son los pasos de…?), función (¿Para qué sirve…?), relación (¿Cómo se relaciona X con Y?), clasificación (¿A qué categoría pertenece…?). EVITA repetir '¿Qué es X?' más de una vez en el lote.")
+    @Guide(description: """
+    Pregunta pedagógica en español. Reglas ESTRICTAS:
+    1. Cada pregunta debe testear comprensión profunda, NO memorización de definiciones. Prohibido el patrón '¿Qué es X?' salvo una vez por lote.
+    2. VARÍA el estilo en cada tarjeta: comparación (¿En qué se diferencia X de Y?), causa-efecto (¿Por qué ocurre X? / ¿Qué consecuencia tiene…?), aplicación (¿Cómo aplicarías X en el contexto Y?), proceso (¿Cuáles son los pasos de…?), error común (¿Por qué es incorrecto pensar que…?), relación (¿Cómo influye X en Y?), predicción (¿Qué pasaría si se elimina X?).
+    3. La pregunta debe poder responderse SOLO con el material proporcionado.
+    4. Redacción clara, directa y sin ambigüedad.
+    """)
     var question: String
 
-    @Guide(description: "Respuesta correcta y concisa, máximo 2 frases")
+    @Guide(description: "Respuesta modelo completa: explica el concepto con suficiente detalle para que un estudiante entienda por qué es correcto. Máximo 3 frases. Incluye el 'por qué' o el 'mecanismo', no solo el dato.")
     var answer: String
 
     /// Tipo de tarjeta (constrained por el enum — el modelo no puede generar otro valor).
+    @Guide(description: "Tipo de tarjeta. DEBES variar: aproximadamente 60% deben ser 'open' (pregunta abierta, requiere elaborar la respuesta) y 40% 'multiple_choice' (concepto concreto con opciones). Nunca generes solo un tipo; alterna de forma explícita.")
     var cardKind: GeneratedCardKind
 
-    @Guide(description: "Solo para multiple_choice: respuesta correcta breve. Para open: string vacío.")
+    @Guide(description: "Solo para multiple_choice: la respuesta correcta, formulada como frase completa y concisa. Para open: string vacío.")
     var mcCorrect: String
 
-    @Guide(description: "Solo para multiple_choice: exactamente 3 distractores plausibles del mismo dominio. Para open: lista vacía.", .maximumCount(3))
+    @Guide(description: "Solo para multiple_choice: exactamente 3 distractores plausibles del mismo dominio. Cada distractor debe ser incorrecto pero creíble (errores típicos de estudiantes, confusiones frecuentes). Para open: lista vacía.", .maximumCount(3))
     var mcDistractors: [String]
 
-    @Guide(description: "1 a 3 términos técnicos reales del material", .minimumCount(1), .maximumCount(3))
+    @Guide(description: "1 a 3 términos técnicos clave del material que cubre esta tarjeta", .minimumCount(1), .maximumCount(3))
     var conceptTags: [String]
 
     @Guide(description: "Copia exacta del título del recurso de origen tal como aparece en la lista RECURSOS")
@@ -51,15 +58,16 @@ struct GeneratedFlashcardItem {
 
 @Generable(description: "Evaluación de la respuesta del estudiante")
 struct GeneratedAnswerEvaluation {
+    @Guide(description: "true si el estudiante demuestra comprensión del concepto central, aunque la respuesta sea breve, informal o incompleta. false SOLO si la respuesta contiene un error conceptual activo o es completamente irrelevante.")
     var isCorrect: Bool
 
-    @Guide(description: "Si isCorrect es true: string vacío. Si no: uno de — conceptual, memoria, confusion, incompleto")
+    @Guide(description: "Usa 'incompleto' cuando isCorrect=true pero faltan ideas clave. Usa 'conceptual', 'memoria' o 'confusion' cuando isCorrect=false. Deja vacío si la respuesta es totalmente correcta.")
     var errorTypeToken: String
 
-    @Guide(description: "Conceptos importantes que faltaron en la respuesta", .maximumCount(6))
+    @Guide(description: "Solo cuando errorTypeToken='incompleto': lista de conceptos o ideas que el estudiante no mencionó pero eran relevantes.", .maximumCount(4))
     var missingConcepts: [String]
 
-    @Guide(description: "Conceptos incorrectos o confundidos", .maximumCount(6))
+    @Guide(description: "Solo cuando isCorrect=false: lista de afirmaciones incorrectas o conceptos confundidos en la respuesta.", .maximumCount(4))
     var incorrectConcepts: [String]
 
     @Guide(description: "Retroalimentación breve y didáctica en español")

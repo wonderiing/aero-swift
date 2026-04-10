@@ -7,16 +7,22 @@ import UniformTypeIdentifiers
 struct StudyDetailView: View {
     @StateObject private var viewModel: StudyDetailViewModel
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedTab = 0
 
     init(study: SDStudy) {
         _viewModel = StateObject(wrappedValue: StudyDetailViewModel(study: study))
     }
 
+    private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
+    private var contentWidth: CGFloat {
+        isLargeCanvas ? AeroAdaptiveLayout.maxRegularContentWidth : AeroAdaptiveLayout.maxCompactContentWidth
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            StudyHeroHeader(study: viewModel.study, reviewCount: viewModel.reviewQueue.count)
-            StudyTabPicker(selectedTab: $selectedTab)
+            StudyHeroHeader(study: viewModel.study, reviewCount: viewModel.reviewQueue.count, isLargeCanvas: isLargeCanvas)
+            StudyTabPicker(selectedTab: $selectedTab, isLargeCanvas: isLargeCanvas)
 
             ZStack {
                 AeroAppBackground()
@@ -25,11 +31,13 @@ struct StudyDetailView: View {
                     ProgressView().frame(maxHeight: .infinity)
                 } else {
                     TabView(selection: $selectedTab) {
-                        ResourcesTab(viewModel: viewModel).tag(0)
-                        FlashcardsTab(viewModel: viewModel).tag(1)
-                        ProgressTab(viewModel: viewModel).tag(2)
+                        ResourcesTab(viewModel: viewModel, isLargeCanvas: isLargeCanvas).tag(0)
+                        FlashcardsTab(viewModel: viewModel, isLargeCanvas: isLargeCanvas).tag(1)
+                        ProgressTab(viewModel: viewModel, isLargeCanvas: isLargeCanvas).tag(2)
                     }
                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                    .frame(maxWidth: contentWidth)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
         }
@@ -87,6 +95,7 @@ struct StudyDetailView: View {
 struct StudyHeroHeader: View {
     let study: SDStudy
     let reviewCount: Int
+    let isLargeCanvas: Bool
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -99,14 +108,14 @@ struct StudyHeroHeader: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(study.title)
-                    .font(.title2)
+                    .font(isLargeCanvas ? .largeTitle : .title2)
                     .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    .foregroundStyle(.white)
 
                 Text(study.desc)
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.8))
-                    .lineLimit(2)
+                    .font(isLargeCanvas ? .body : .subheadline)
+                    .foregroundStyle(.white.opacity(0.8))
+                    .lineLimit(isLargeCanvas ? 3 : 2)
 
                 if reviewCount > 0 {
                     NavigationLink(destination: PracticeSessionView(study: study)) {
@@ -114,23 +123,22 @@ struct StudyHeroHeader: View {
                             Image(systemName: "play.fill").font(.caption)
                             Text("Practicar · \(reviewCount) tarjeta\(reviewCount == 1 ? "" : "s")")
                                 .fontWeight(.semibold)
-                                .font(.subheadline)
+                                .font(isLargeCanvas ? .body : .subheadline)
                         }
-                        .foregroundColor(Color(red: 0.28, green: 0.22, blue: 0.92))
+                        .foregroundStyle(Color(red: 0.28, green: 0.22, blue: 0.92))
                         .padding(.horizontal, 16)
-                        .padding(.vertical, 9)
-                        .background(Color.white)
-                        .cornerRadius(20)
+                        .padding(.vertical, isLargeCanvas ? 12 : 9)
+                        .background(Color.white, in: Capsule())
                     }
                     .padding(.top, 4)
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 20)
-            .padding(.top, 16)
+            .padding(.bottom, isLargeCanvas ? 26 : 20)
+            .padding(.top, isLargeCanvas ? 22 : 16)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: reviewCount > 0 ? 178 : 128)
+        .frame(height: reviewCount > 0 ? (isLargeCanvas ? 220 : 178) : (isLargeCanvas ? 164 : 128))
     }
 }
 
@@ -138,6 +146,7 @@ struct StudyHeroHeader: View {
 
 struct StudyTabPicker: View {
     @Binding var selectedTab: Int
+    let isLargeCanvas: Bool
 
     private let tabs: [(String, String)] = [
         ("Recursos", "doc.text"),
@@ -156,12 +165,12 @@ struct StudyTabPicker: View {
                     HStack(spacing: 5) {
                         Image(systemName: tabs[idx].1).font(.caption)
                         Text(tabs[idx].0)
-                            .font(.subheadline)
+                            .font(isLargeCanvas ? .body : .subheadline)
                             .fontWeight(selectedTab == idx ? .semibold : .regular)
                     }
                     .foregroundColor(selectedTab == idx ? .white : .secondary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
+                    .padding(.horizontal, isLargeCanvas ? 18 : 14)
+                    .padding(.vertical, isLargeCanvas ? 11 : 9)
                     .background(
                         Capsule().fill(selectedTab == idx ? Color.indigo : Color.clear)
                     )
@@ -173,7 +182,7 @@ struct StudyTabPicker: View {
             RoundedRectangle(cornerRadius: 18)
                 .fill(.ultraThinMaterial)
         )
-        .padding(.horizontal, 16)
+        .padding(.horizontal, isLargeCanvas ? 24 : 16)
         .padding(.vertical, 12)
     }
 }
@@ -182,6 +191,14 @@ struct StudyTabPicker: View {
 
 struct ResourcesTab: View {
     @ObservedObject var viewModel: StudyDetailViewModel
+    let isLargeCanvas: Bool
+
+    private var columns: [GridItem] {
+        if isLargeCanvas {
+            return [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+        }
+        return [GridItem(.flexible())]
+    }
 
     var body: some View {
         if viewModel.resources.isEmpty {
@@ -203,17 +220,17 @@ struct ResourcesTab: View {
             }
         } else {
             ScrollView {
-                LazyVStack(spacing: 10) {
+                LazyVGrid(columns: columns, spacing: 10) {
                     ForEach(viewModel.resources) { resource in
                         NavigationLink {
                             ResourceDetailView(studyViewModel: viewModel, resource: resource)
                         } label: {
-                            ResourceCardView(resource: resource)
+                            ResourceCardView(resource: resource, isLargeCanvas: isLargeCanvas)
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, isLargeCanvas ? 24 : 16)
                 .padding(.vertical, 12)
             }
         }
@@ -222,6 +239,7 @@ struct ResourcesTab: View {
 
 struct ResourceCardView: View {
     let resource: SDResource
+    let isLargeCanvas: Bool
 
     var body: some View {
         AeroSurfaceCard {
@@ -238,13 +256,13 @@ struct ResourceCardView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(resource.title)
-                        .font(.headline)
+                        .font(isLargeCanvas ? .title3 : .headline)
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                     Text(resource.content)
-                        .font(.caption)
+                        .font(isLargeCanvas ? .callout : .caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(isLargeCanvas ? 3 : 2)
                     if let src = resource.sourceName {
                         Label(src, systemImage: "paperclip")
                             .font(.caption2)
@@ -266,6 +284,14 @@ struct ResourceCardView: View {
 
 struct FlashcardsTab: View {
     @ObservedObject var viewModel: StudyDetailViewModel
+    let isLargeCanvas: Bool
+
+    private var columns: [GridItem] {
+        if isLargeCanvas {
+            return [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+        }
+        return [GridItem(.flexible())]
+    }
 
     var body: some View {
         if viewModel.flashcards.isEmpty {
@@ -284,6 +310,7 @@ struct FlashcardsTab: View {
                     }
                     .buttonStyle(AeroPrimaryButtonStyle(disabled: viewModel.resources.isEmpty))
                     .disabled(viewModel.resources.isEmpty)
+                    .controlSize(isLargeCanvas ? .large : .regular)
 
                     Button {
                         viewModel.showingCreateFlashcardManual = true
@@ -294,18 +321,19 @@ struct FlashcardsTab: View {
                     .buttonStyle(.borderedProminent)
                     .tint(.indigo.opacity(0.75))
                     .disabled(viewModel.resources.isEmpty)
+                    .controlSize(isLargeCanvas ? .large : .regular)
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 34)
             }
         } else {
             ScrollView {
-                LazyVStack(spacing: 10) {
+                LazyVGrid(columns: columns, spacing: 10) {
                     ForEach(viewModel.flashcards) { card in
-                        FlashcardItemView(card: card)
+                        FlashcardItemView(card: card, isLargeCanvas: isLargeCanvas)
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, isLargeCanvas ? 24 : 16)
                 .padding(.vertical, 12)
             }
         }
@@ -314,6 +342,7 @@ struct FlashcardsTab: View {
 
 struct FlashcardItemView: View {
     let card: SDFlashcard
+    let isLargeCanvas: Bool
     @State private var isExpanded = false
 
     var body: some View {
@@ -321,67 +350,64 @@ struct FlashcardItemView: View {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) { isExpanded.toggle() }
         } label: {
             AeroSurfaceCard {
-                HStack(alignment: .top, spacing: 12) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(card.type == .open ? Color.indigo : Color.purple)
-                        .frame(width: 3)
-                        .padding(.vertical, 2)
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .center) {
+                        Label(card.type == .open ? "Abierta" : "Opción múltiple",
+                              systemImage: card.type == .open ? "text.bubble" : "list.bullet.circle")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(card.type == .open ? Color.indigo : Color.purple)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .background((card.type == .open ? Color.indigo : Color.purple).opacity(0.1))
+                            .clipShape(.rect(cornerRadius: 7))
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text(card.type == .open ? "Abierta" : "Opción múltiple")
-                                .font(.caption2)
-                                .fontWeight(.medium)
-                                .foregroundStyle(card.type == .open ? .indigo : .purple)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background((card.type == .open ? Color.indigo : Color.purple).opacity(0.1))
-                                .clipShape(.rect(cornerRadius: 6))
+                        Spacer()
 
-                            Spacer()
-
-                            if card.intervalDays > 0 {
-                                Label("en \(card.intervalDays)d", systemImage: "clock")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
+                        if card.intervalDays > 0 {
+                            Label("en \(card.intervalDays)d", systemImage: "clock")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
 
-                        Text(card.question)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .lineLimit(isExpanded ? nil : 2)
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 4)
+                    }
 
-                        if isExpanded {
-                            Divider().padding(.vertical, 2)
+                    Text(card.question)
+                        .font(isLargeCanvas ? .callout : .body)
+                        .fontWeight(.medium)
+                        .lineLimit(isExpanded ? nil : 3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                            Text(card.answer)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                    if isExpanded {
+                        Divider()
 
-                            if !card.conceptTags.isEmpty {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 6) {
-                                        ForEach(card.conceptTags, id: \.self) { tag in
-                                            Text("#\(tag)")
-                                                .font(.caption2)
-                                                .padding(.horizontal, 8)
-                                                .padding(.vertical, 3)
-                                                .background(Color.teal.opacity(0.1))
-                                                .foregroundStyle(.teal)
-                                                .clipShape(.rect(cornerRadius: 6))
-                                        }
+                        Text(card.answer)
+                            .font(isLargeCanvas ? .body : .subheadline)
+                            .lineSpacing(3)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if !card.conceptTags.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(card.conceptTags, id: \.self) { tag in
+                                        Text("#\(tag)")
+                                            .font(.caption)
+                                            .padding(.horizontal, 9)
+                                            .padding(.vertical, 4)
+                                            .background(Color.teal.opacity(0.1))
+                                            .foregroundStyle(.teal)
+                                            .clipShape(.rect(cornerRadius: 7))
                                     }
                                 }
-                                .padding(.top, 2)
                             }
                         }
                     }
-
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 3)
                 }
             }
         }
@@ -393,6 +419,7 @@ struct FlashcardItemView: View {
 
 struct ProgressTab: View {
     @ObservedObject var viewModel: StudyDetailViewModel
+    let isLargeCanvas: Bool
 
     var body: some View {
         if let gaps = viewModel.gapAnalysis {
@@ -426,12 +453,36 @@ struct ProgressTab: View {
 
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("Precisión general")
-                                    .font(.headline)
+                                    .font(isLargeCanvas ? .title3 : .headline)
                                 StatRow(label: "Total", value: "\(totalAtt)")
                                 StatRow(label: "Aciertos", value: "\(correctAtt)", color: .green)
                                 StatRow(label: "Errores", value: "\(totalAtt - correctAtt)", color: .red)
                             }
                             Spacer()
+                        }
+                    }
+
+                    if !gaps.errorTypeBreakdown.isEmpty {
+                        ProgressSectionHeader(title: "Errores por tipo",
+                                              systemImage: "chart.bar.fill",
+                                              color: .indigo)
+                        AeroSurfaceCard {
+                            VStack(spacing: 10) {
+                                ForEach(gaps.errorTypeBreakdown, id: \.type.rawValue) { item in
+                                    let pct = totalAtt > 0 ? Double(item.count) / Double(totalAtt) : 0
+                                    HStack {
+                                        Text(item.type.rawValue.capitalized)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        Spacer()
+                                        Text("\(item.count) · \(Int(pct * 100))%")
+                                            .font(.caption)
+                                            .fontWeight(.semibold)
+                                    }
+                                    ProgressView(value: pct)
+                                        .tint(.indigo)
+                                }
+                            }
                         }
                     }
 
@@ -453,7 +504,7 @@ struct ProgressTab: View {
                         }
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, isLargeCanvas ? 24 : 16)
                 .padding(.vertical, 12)
             }
         } else {
@@ -549,10 +600,16 @@ struct StrongConceptCardView: View {
 struct AddResourceView: View {
     @ObservedObject var viewModel: StudyDetailViewModel
     @Environment(\.dismiss) var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var showFileImporter = false
     @State private var isExtracting = false
     @State private var importError: String?
+
+    private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
+    private var contentWidth: CGFloat {
+        isLargeCanvas ? AeroAdaptiveLayout.maxRegularContentWidth : AeroAdaptiveLayout.maxCompactContentWidth
+    }
 
     var body: some View {
         NavigationStack {
@@ -567,7 +624,7 @@ struct AddResourceView: View {
                                 .padding(.leading, 4)
                         }
                         TextEditor(text: $viewModel.resourceContent)
-                            .frame(minHeight: 200)
+                            .frame(minHeight: isLargeCanvas ? 280 : 200)
                     }
                 }
 
@@ -595,6 +652,8 @@ struct AddResourceView: View {
             }
             .navigationTitle("Agregar recurso")
             .navigationBarTitleDisplayMode(.inline)
+            .frame(maxWidth: contentWidth)
+            .frame(maxWidth: .infinity, alignment: .center)
             .fileImporter(
                 isPresented: $showFileImporter,
                 allowedContentTypes: [.pdf, .image],
@@ -650,6 +709,7 @@ struct AddResourceView: View {
 struct CreateFlashcardManualView: View {
     @ObservedObject var viewModel: StudyDetailViewModel
     @Environment(\.dismiss) var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var question = ""
     @State private var answer = ""
@@ -660,6 +720,11 @@ struct CreateFlashcardManualView: View {
     @State private var distractor2 = ""
     @State private var distractor3 = ""
     @State private var isSaving = false
+
+    private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
+    private var contentWidth: CGFloat {
+        isLargeCanvas ? AeroAdaptiveLayout.maxRegularContentWidth : AeroAdaptiveLayout.maxCompactContentWidth
+    }
 
     private var effectiveResourceId: UUID? {
         selectedResourceId ?? viewModel.resources.first?.id
@@ -706,20 +771,21 @@ struct CreateFlashcardManualView: View {
                         Text("Opción múltiple").tag(FlashcardType.multipleChoice)
                     }
                     .pickerStyle(.segmented)
+                    .controlSize(isLargeCanvas ? .large : .regular)
                 } header: {
                     Text("Tipo de tarjeta")
                 }
 
                 Section {
                     TextEditor(text: $question)
-                        .frame(minHeight: 80)
+                        .frame(minHeight: isLargeCanvas ? 120 : 80)
                 } header: {
                     Text("Pregunta")
                 }
 
                 Section {
                     TextEditor(text: $answer)
-                        .frame(minHeight: 60)
+                        .frame(minHeight: isLargeCanvas ? 100 : 60)
                 } header: {
                     Text("Respuesta correcta")
                 }
@@ -746,6 +812,8 @@ struct CreateFlashcardManualView: View {
             }
             .navigationTitle("Nueva Flashcard")
             .navigationBarTitleDisplayMode(.inline)
+            .frame(maxWidth: contentWidth)
+            .frame(maxWidth: .infinity, alignment: .center)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancelar") { dismiss() }

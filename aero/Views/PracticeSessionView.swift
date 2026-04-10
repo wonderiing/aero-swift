@@ -4,11 +4,17 @@ import SwiftData
 struct PracticeSessionView: View {
     @StateObject private var viewModel: PracticeSessionViewModel
     @StateObject private var speech = SpeechInputController()
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(study: SDStudy) {
         _viewModel = StateObject(wrappedValue: PracticeSessionViewModel(study: study))
+    }
+
+    private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
+    private var contentWidth: CGFloat {
+        isLargeCanvas ? AeroAdaptiveLayout.maxRegularContentWidth : AeroAdaptiveLayout.maxCompactContentWidth
     }
 
     var body: some View {
@@ -26,8 +32,8 @@ struct PracticeSessionView: View {
             } else if viewModel.flashcards.isEmpty {
                 NoCardsView(action: { dismiss() })
             } else {
-                VStack(spacing: 20) {
-                    ProgressHeader(current: viewModel.currentIndex + 1, total: viewModel.flashcards.count)
+                VStack(spacing: 16) {
+                    ProgressHeader(current: viewModel.currentIndex + 1, total: viewModel.flashcards.count, isLargeCanvas: isLargeCanvas)
 
                     FlashcardView(
                         card: viewModel.flashcards[viewModel.currentIndex],
@@ -42,18 +48,20 @@ struct PracticeSessionView: View {
                         onExplainMore: {
                             Task { await viewModel.explainMore() }
                         },
-                        speech: speech
+                        speech: speech,
+                        isLargeCanvas: isLargeCanvas
                     )
 
-                    Spacer()
-
-                    BottomControls(viewModel: viewModel)
+                    BottomControls(viewModel: viewModel, isLargeCanvas: isLargeCanvas)
                 }
-                .padding()
+                .padding(.horizontal, isLargeCanvas ? 24 : 20)
+                .padding(.bottom, 16)
+                .frame(maxWidth: contentWidth)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
         }
         .navigationTitle("Sesión de Repaso")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(isLargeCanvas ? .automatic : .inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -73,24 +81,25 @@ struct PracticeSessionView: View {
 struct ProgressHeader: View {
     let current: Int
     let total: Int
+    let isLargeCanvas: Bool
 
     var body: some View {
-        AeroSurfaceCard {
-            VStack(spacing: 8) {
-                HStack {
-                    Text("Tarjeta \(current) de \(total)")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                    Spacer()
-                    Text("\(Int(Double(current - 1) / Double(max(total, 1)) * 100))%")
-                        .font(.caption)
-                        .foregroundStyle(.indigo)
-                }
-
-                ProgressView(value: Double(current - 1), total: Double(max(total, 1)))
-                    .tint(.indigo)
+        VStack(spacing: 12) {
+            HStack {
+                Text("Tarjeta \(current) de \(total)")
+                    .font(isLargeCanvas ? .title3 : .headline)
+                    .fontWeight(.semibold)
+                Spacer()
+                Text("\(Int(Double(current - 1) / Double(max(total, 1)) * 100))%")
+                    .font(isLargeCanvas ? .title3 : .headline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.indigo)
             }
+            ProgressView(value: Double(current - 1), total: Double(max(total, 1)))
+                .tint(.indigo)
+                .scaleEffect(x: 1, y: 2)
         }
+        .padding(.top, 4)
     }
 }
 
@@ -106,23 +115,32 @@ struct FlashcardView: View {
     let isExpandingExplanation: Bool
     let onExplainMore: () -> Void
     @ObservedObject var speech: SpeechInputController
+    let isLargeCanvas: Bool
 
     var body: some View {
-        AeroSurfaceCard {
+        ScrollView {
             VStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("PREGUNTA")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.indigo)
+                // Question section
+                VStack(alignment: .leading, spacing: 18) {
+                    Label(card.type == .open ? "Pregunta abierta" : "Opción múltiple",
+                          systemImage: card.type == .open ? "text.bubble" : "list.bullet.circle")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(card.type == .open ? Color.indigo : Color.purple)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background((card.type == .open ? Color.indigo : Color.purple).opacity(0.1))
+                        .clipShape(.rect(cornerRadius: 10))
 
                     Text(card.question)
-                        .font(.title3)
-                        .fontWeight(.medium)
+                        .font(isLargeCanvas ? .largeTitle : .title2)
+                        .fontWeight(.semibold)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(24)
+                .padding(28)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 Divider()
 
@@ -132,101 +150,136 @@ struct FlashcardView: View {
                     inputSection
                 }
             }
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.20), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.07), radius: 14, y: 6)
+            )
         }
+        .scrollBounceBehavior(.basedOnSize)
     }
 
     @ViewBuilder
     private var answerSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("RESPUESTA MODELO")
-                .font(.caption2)
-                .fontWeight(.bold)
-                .foregroundColor(.green)
-
-            Text(card.answer)
-                .font(.body)
-                .foregroundColor(.primary)
+        VStack(alignment: .leading, spacing: 20) {
+            // For MC cards always show the model answer; for open cards only show it if incorrect
+            if card.type == .multipleChoice {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Respuesta correcta")
+                        .font(.callout)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.green)
+                        .textCase(.uppercase)
+                    Text(card.answer)
+                        .font(.title3)
+                        .lineSpacing(4)
+                        .foregroundStyle(.primary)
+                }
+            }
 
             if let ev = evaluation {
+                // Result badge
                 if ev.isCorrect {
-                    Label("Correcto", systemImage: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                        .font(.subheadline)
+                    let isPartial = ev.errorType == .incompleto || !(ev.missingConcepts ?? []).isEmpty
+                    Label(isPartial ? "Correcto — incompleto" : "Correcto",
+                          systemImage: isPartial ? "checkmark.seal.fill" : "checkmark.circle.fill")
+                        .foregroundStyle(isPartial ? Color.teal : Color.green)
+                        .font(.title3)
+                        .fontWeight(.bold)
                 } else {
-                    Label("A revisar", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
-                        .font(.subheadline)
+                    Label("Incorrecto", systemImage: "xmark.circle.fill")
+                        .foregroundStyle(.red)
+                        .font(.title3)
+                        .fontWeight(.bold)
+                }
+
+                // Show model answer for open cards only when wrong
+                if card.type == .open && !ev.isCorrect {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Respuesta correcta")
+                            .font(.callout)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.secondary)
+                        Text(card.answer)
+                            .font(.title3)
+                            .lineSpacing(4)
+                            .foregroundStyle(.primary)
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.red.opacity(0.05))
+                    .clipShape(.rect(cornerRadius: 12))
+                }
+
+                // Missing concepts for partial correct
+                if let missing = ev.missingConcepts, !missing.isEmpty {
+                    Text("Te faltó mencionar: \(missing.joined(separator: ", ")).")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                }
+
+                // Feedback
+                if let fb = ev.feedback, !fb.isEmpty {
+                    Text(fb)
+                        .font(.body)
+                        .lineSpacing(4)
+                        .foregroundStyle(.secondary)
                 }
 
                 if usedAppleIntelligence {
-                    Label("Evaluación con Foundation Models", systemImage: "apple.intelligence")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-
-                if let fb = ev.feedback {
-                    Text(fb)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 4)
-                }
-
-                if !ev.isCorrect, let err = ev.errorType {
-                    Text("Tipo de error: \(errorTypeLabel(err))")
+                    Label("Evaluado con Foundation Models", systemImage: "apple.intelligence")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.tertiary)
                 }
 
                 Button(action: onExplainMore) {
                     if isExpandingExplanation {
-                        ProgressView()
-                            .scaleEffect(0.9)
+                        ProgressView().scaleEffect(0.9)
                     } else {
                         Label("Explicar más", systemImage: "text.book.closed")
+                            .font(.body)
+                            .fontWeight(.medium)
                     }
                 }
                 .buttonStyle(.bordered)
-                .padding(.top, 8)
+                .controlSize(.large)
 
                 if let more = expandedExplanation, !more.isEmpty {
                     Text(more)
-                        .font(.footnote)
+                        .font(.body)
+                        .lineSpacing(4)
                         .foregroundStyle(.primary)
-                        .padding(.top, 8)
                 }
             }
         }
-        .padding(24)
+        .padding(28)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.green.opacity(0.05))
+        .background(Color.green.opacity(0.03))
         .transition(.move(edge: .bottom).combined(with: .opacity))
-    }
-
-    private func errorTypeLabel(_ t: ErrorType) -> String {
-        switch t {
-        case .conceptual: return "conceptual"
-        case .memoria: return "memoria"
-        case .confusion: return "confusión"
-        case .incompleto: return "incompleto"
-        }
     }
 
     @ViewBuilder
     private var inputSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("TU RESPUESTA")
-                .font(.caption2)
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Tu respuesta")
+                .font(.callout)
                 .fontWeight(.bold)
-                .foregroundColor(.gray)
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
 
             if card.type == .open {
                 TextEditor(text: $userAnswer)
-                    .frame(minHeight: 120)
-                    .padding(8)
-                    .background(Color(uiColor: .systemGray6))
-                    .clipShape(.rect(cornerRadius: 8))
+                    .font(isLargeCanvas ? .title2 : .title3)
+                    .frame(minHeight: isLargeCanvas ? 220 : 160)
+                    .padding(14)
+                    .background(Color.aeroSecondaryBackground)
+                    .clipShape(.rect(cornerRadius: 14))
 
-                HStack {
+                HStack(spacing: 12) {
                     Button {
                         Task {
                             let ok = await speech.requestAuthorization()
@@ -234,52 +287,64 @@ struct FlashcardView: View {
                             if speech.isRecording {
                                 speech.stop()
                             } else {
-                                speech.start { text in
-                                    userAnswer = text
-                                }
+                                speech.start { text in userAnswer = text }
                             }
                         }
                     } label: {
-                        Label(speech.isRecording ? "Detener" : "Dictar", systemImage: speech.isRecording ? "stop.circle.fill" : "mic.fill")
-                            .font(.subheadline)
+                        Label(speech.isRecording ? "Detener" : "Dictar",
+                              systemImage: speech.isRecording ? "stop.circle.fill" : "mic.fill")
+                            .font(.body)
+                            .fontWeight(.medium)
                     }
                     .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .tint(speech.isRecording ? .red : .indigo)
 
                     if speech.authorizationDenied {
-                        Text("Activa micrófono y reconocimiento de voz en Ajustes.")
-                            .font(.caption2)
+                        Text("Activa micrófono en Ajustes.")
+                            .font(.subheadline)
                             .foregroundStyle(.red)
                     }
                     Spacer()
                 }
             } else {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 14) {
                     ForEach(shuffledOptions, id: \.self) { opt in
                         Button {
                             selectedMCOption = opt
                         } label: {
-                            HStack {
+                            HStack(spacing: 16) {
                                 Image(systemName: selectedMCOption == opt ? "largecircle.fill.circle" : "circle")
+                                    .font(.title2)
+                                    .foregroundStyle(selectedMCOption == opt ? Color.indigo : Color.secondary)
                                 Text(opt)
+                                    .font(.title3)
+                                    .fontWeight(selectedMCOption == opt ? .medium : .regular)
                                     .multilineTextAlignment(.leading)
-                                Spacer()
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .padding(12)
-                            .background(selectedMCOption == opt ? Color.blue.opacity(0.12) : Color(uiColor: .systemGray6))
-                            .clipShape(.rect(cornerRadius: 10))
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 18)
+                            .background(selectedMCOption == opt ? Color.indigo.opacity(0.10) : Color.aeroSecondaryBackground)
+                            .clipShape(.rect(cornerRadius: 16))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .strokeBorder(selectedMCOption == opt ? Color.indigo.opacity(0.4) : Color.clear, lineWidth: 2)
+                            )
                         }
                         .buttonStyle(.plain)
+                        .animation(.spring(response: 0.28, dampingFraction: 0.8), value: selectedMCOption)
                     }
                 }
             }
         }
-        .padding(24)
-        .background(Color.white)
+        .padding(28)
     }
 }
 
 struct BottomControls: View {
     @ObservedObject var viewModel: PracticeSessionViewModel
+    let isLargeCanvas: Bool
 
     var body: some View {
         VStack {
@@ -292,6 +357,7 @@ struct BottomControls: View {
                     .font(.headline)
                 }
                 .buttonStyle(AeroPrimaryButtonStyle())
+                .controlSize(isLargeCanvas ? .large : .regular)
             } else {
                 Button {
                     Task { await viewModel.submitAnswer() }
@@ -309,6 +375,7 @@ struct BottomControls: View {
                 }
                 .buttonStyle(AeroPrimaryButtonStyle(disabled: !viewModel.canSubmit || viewModel.isEvaluating))
                 .disabled(!viewModel.canSubmit || viewModel.isEvaluating)
+                .controlSize(isLargeCanvas ? .large : .regular)
             }
         }
     }
@@ -380,7 +447,7 @@ struct NoCardsView: View {
 }
 
 #Preview("Cabecera progreso") {
-    ProgressHeader(current: 2, total: 5)
+    ProgressHeader(current: 2, total: 5, isLargeCanvas: false)
         .padding()
 }
 #endif

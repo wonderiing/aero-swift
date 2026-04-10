@@ -1,0 +1,232 @@
+{
+  "source": "/Users/Alumno/Desktop/hackathon/aero/aero/Views/PracticeSessionView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Sesión de Repaso",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 63
+        }
+      },
+      {
+        "comment": "",
+        "key": "Preparando sesión...",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 25
+        }
+      },
+      {
+        "comment": "",
+        "key": "Salir",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 68
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tarjeta %lld de %lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 89
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 93
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pregunta abierta",
+        "location": {
+          "startingColumn": 48,
+          "startingLine": 125
+        }
+      },
+      {
+        "comment": "",
+        "key": "Opción múltiple",
+        "location": {
+          "startingColumn": 69,
+          "startingLine": 125
+        }
+      },
+      {
+        "comment": "",
+        "key": "Te faltó mencionar: %@.",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 220
+        }
+      },
+      {
+        "comment": "",
+        "key": "Correcto — incompleto",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 188
+        }
+      },
+      {
+        "comment": "",
+        "key": "Correcto",
+        "location": {
+          "startingColumn": 67,
+          "startingLine": 188
+        }
+      },
+      {
+        "comment": "",
+        "key": "Incorrecto",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 194
+        }
+      },
+      {
+        "comment": "",
+        "key": "Evaluado con Foundation Models",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 234
+        }
+      },
+      {
+        "comment": "",
+        "key": "Respuesta correcta",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 172
+        }
+      },
+      {
+        "comment": "",
+        "key": "Respuesta correcta",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 203
+        }
+      },
+      {
+        "comment": "",
+        "key": "Explicar más",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 243
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tu respuesta",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 268
+        }
+      },
+      {
+        "comment": "",
+        "key": "Activa micrófono en Ajustes.",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 304
+        }
+      },
+      {
+        "comment": "",
+        "key": "Detener",
+        "location": {
+          "startingColumn": 52,
+          "startingLine": 294
+        }
+      },
+      {
+        "comment": "",
+        "key": "Dictar",
+        "location": {
+          "startingColumn": 64,
+          "startingLine": 294
+        }
+      },
+      {
+        "comment": "",
+        "key": "Siguiente Tarjeta",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 354
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enviar (IA on-device)",
+        "location": {
+          "startingColumn": 87,
+          "startingLine": 370
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enviar respuesta",
+        "location": {
+          "startingColumn": 113,
+          "startingLine": 370
+        }
+      },
+      {
+        "comment": "",
+        "key": "¡Sesión completada!",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 396
+        }
+      },
+      {
+        "comment": "",
+        "key": "Has respondido %lld tarjetas. Aciertos: %lld. El algoritmo SM-2 actualizará tus próximos repasos.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 399
+        }
+      },
+      {
+        "comment": "",
+        "key": "Volver al estudio",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 407
+        }
+      },
+      {
+        "comment": "",
+        "key": "¡Estás al día!",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 426
+        }
+      },
+      {
+        "comment": "",
+        "key": "No tienes flashcards pendientes de repaso para este estudio ahora.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 429
+        }
+      },
+      {
+        "comment": "",
+        "key": "Volver",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 433
+        }
+      }
+    ]
+  },
+  "version": 1
+}

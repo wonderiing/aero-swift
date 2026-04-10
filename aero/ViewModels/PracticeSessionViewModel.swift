@@ -94,7 +94,18 @@ final class PracticeSessionViewModel: ObservableObject {
         lastEvaluationUsedAppleIntelligence = false
 
         let dto: CreateAttemptDto
-        if IntelligentStudyAssistant.isAppleIntelligenceReady {
+        if currentCard.type == .multipleChoice {
+            // Opción múltiple: evaluación instantánea, sin IA.
+            // Las opciones (incluyendo la correcta) ya vienen guardadas en `currentCard.options`.
+            dto = AnswerEvaluationService.evaluate(
+                question: currentCard.question,
+                correctAnswer: currentCard.answer,
+                userAnswer: nil,
+                selectedMultipleChoice: selectedMCOption,
+                cardType: currentCard.type,
+                options: currentCard.options
+            )
+        } else if IntelligentStudyAssistant.isAppleIntelligenceReady {
             do {
                 dto = try await IntelligentStudyAssistant.evaluateStudentAnswer(
                     question: currentCard.question,
