@@ -13,8 +13,7 @@ struct PracticeSessionView: View {
 
     var body: some View {
         ZStack {
-            Color(uiColor: .systemGroupedBackground)
-                .ignoresSafeArea()
+            AeroAppBackground()
 
             if viewModel.isLoading {
                 ProgressView("Preparando sesión...")
@@ -76,19 +75,21 @@ struct ProgressHeader: View {
     let total: Int
 
     var body: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Text("Tarjeta \(current) de \(total)")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                Spacer()
-                Text("\(Int(Double(current - 1) / Double(max(total, 1)) * 100))%")
-                    .font(.caption)
-                    .foregroundColor(.blue)
-            }
+        AeroSurfaceCard {
+            VStack(spacing: 8) {
+                HStack {
+                    Text("Tarjeta \(current) de \(total)")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                    Spacer()
+                    Text("\(Int(Double(current - 1) / Double(max(total, 1)) * 100))%")
+                        .font(.caption)
+                        .foregroundStyle(.indigo)
+                }
 
-            ProgressView(value: Double(current - 1), total: Double(max(total, 1)))
-                .tint(.blue)
+                ProgressView(value: Double(current - 1), total: Double(max(total, 1)))
+                    .tint(.indigo)
+            }
         }
     }
 }
@@ -107,32 +108,31 @@ struct FlashcardView: View {
     @ObservedObject var speech: SpeechInputController
 
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("PREGUNTA")
-                    .font(.caption2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.blue)
+        AeroSurfaceCard {
+            VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("PREGUNTA")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.indigo)
 
-                Text(card.question)
-                    .font(.title3)
-                    .fontWeight(.medium)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(24)
-            .background(Color.white)
+                    Text(card.question)
+                        .font(.title3)
+                        .fontWeight(.medium)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(24)
 
-            Divider()
+                Divider()
 
-            if isShowingAnswer {
-                answerSection
-            } else {
-                inputSection
+                if isShowingAnswer {
+                    answerSection
+                } else {
+                    inputSection
+                }
             }
         }
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
     }
 
     @ViewBuilder
@@ -161,20 +161,20 @@ struct FlashcardView: View {
                 if usedAppleIntelligence {
                     Label("Evaluación con Foundation Models", systemImage: "apple.intelligence")
                         .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
 
                 if let fb = ev.feedback {
                     Text(fb)
                         .font(.footnote)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                         .padding(.top, 4)
                 }
 
                 if !ev.isCorrect, let err = ev.errorType {
                     Text("Tipo de error: \(errorTypeLabel(err))")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
 
                 Button(action: onExplainMore) {
@@ -191,7 +191,7 @@ struct FlashcardView: View {
                 if let more = expandedExplanation, !more.isEmpty {
                     Text(more)
                         .font(.footnote)
-                        .foregroundColor(.primary)
+                        .foregroundStyle(.primary)
                         .padding(.top, 8)
                 }
             }
@@ -224,7 +224,7 @@ struct FlashcardView: View {
                     .frame(minHeight: 120)
                     .padding(8)
                     .background(Color(uiColor: .systemGray6))
-                    .cornerRadius(8)
+                    .clipShape(.rect(cornerRadius: 8))
 
                 HStack {
                     Button {
@@ -248,7 +248,7 @@ struct FlashcardView: View {
                     if speech.authorizationDenied {
                         Text("Activa micrófono y reconocimiento de voz en Ajustes.")
                             .font(.caption2)
-                            .foregroundColor(.red)
+                            .foregroundStyle(.red)
                     }
                     Spacer()
                 }
@@ -266,7 +266,7 @@ struct FlashcardView: View {
                             }
                             .padding(12)
                             .background(selectedMCOption == opt ? Color.blue.opacity(0.12) : Color(uiColor: .systemGray6))
-                            .cornerRadius(10)
+                            .clipShape(.rect(cornerRadius: 10))
                         }
                         .buttonStyle(.plain)
                     }
@@ -290,12 +290,8 @@ struct BottomControls: View {
                         Image(systemName: "arrow.right")
                     }
                     .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
                 }
+                .buttonStyle(AeroPrimaryButtonStyle())
             } else {
                 Button {
                     Task { await viewModel.submitAnswer() }
@@ -310,12 +306,8 @@ struct BottomControls: View {
                         }
                     }
                     .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
                 }
+                .buttonStyle(AeroPrimaryButtonStyle(disabled: !viewModel.canSubmit || viewModel.isEvaluating))
                 .disabled(!viewModel.canSubmit || viewModel.isEvaluating)
             }
         }
@@ -331,7 +323,7 @@ struct SessionCompleteView: View {
         VStack(spacing: 24) {
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 100))
-                .foregroundColor(.green)
+                .foregroundStyle(.green)
 
             VStack(spacing: 8) {
                 Text("¡Sesión completada!")
@@ -339,7 +331,7 @@ struct SessionCompleteView: View {
                     .fontWeight(.bold)
                 Text("Has respondido \(total) tarjetas. Aciertos: \(correct). El algoritmo SM-2 actualizará tus próximos repasos.")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
@@ -347,12 +339,9 @@ struct SessionCompleteView: View {
             Button(action: action) {
                 Text("Volver al estudio")
                     .fontWeight(.bold)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
+                    .font(.headline)
             }
+            .buttonStyle(AeroPrimaryButtonStyle())
             .padding(.horizontal, 40)
         }
     }
@@ -362,19 +351,21 @@ struct NoCardsView: View {
     let action: () -> Void
 
     var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 80))
-                .foregroundColor(.blue.opacity(0.3))
-            Text("¡Estás al día!")
-                .font(.title3)
-                .fontWeight(.bold)
-            Text("No tienes flashcards pendientes de repaso para este estudio ahora.")
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            Button("Volver", action: action)
-                .buttonStyle(.bordered)
+        AeroSurfaceCard {
+            VStack(spacing: 20) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 80))
+                    .foregroundStyle(.indigo.opacity(0.35))
+                Text("¡Estás al día!")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                Text("No tienes flashcards pendientes de repaso para este estudio ahora.")
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                Button("Volver", action: action)
+                    .buttonStyle(.bordered)
+            }
         }
     }
 }

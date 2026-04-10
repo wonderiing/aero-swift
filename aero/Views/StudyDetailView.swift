@@ -19,7 +19,7 @@ struct StudyDetailView: View {
             StudyTabPicker(selectedTab: $selectedTab)
 
             ZStack {
-                Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
+                AeroAppBackground()
 
                 if viewModel.isLoading && viewModel.resources.isEmpty && viewModel.flashcards.isEmpty {
                     ProgressView().frame(maxHeight: .infinity)
@@ -171,11 +171,10 @@ struct StudyTabPicker: View {
         .padding(5)
         .background(
             RoundedRectangle(cornerRadius: 18)
-                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                .fill(.ultraThinMaterial)
         )
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color(uiColor: .systemGroupedBackground))
     }
 }
 
@@ -186,39 +185,22 @@ struct ResourcesTab: View {
 
     var body: some View {
         if viewModel.resources.isEmpty {
-            VStack(spacing: 22) {
-                ZStack {
-                    Circle()
-                        .fill(LinearGradient(colors: [.indigo.opacity(0.12), .purple.opacity(0.08)],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .frame(width: 100, height: 100)
-                    Image(systemName: "doc.badge.plus")
-                        .font(.system(size: 42))
-                        .foregroundStyle(LinearGradient(colors: [.indigo, .purple],
-                                                        startPoint: .top, endPoint: .bottom))
-                }
-                VStack(spacing: 8) {
-                    Text("Sin recursos todavía")
-                        .font(.headline)
-                    Text("Agrega apuntes o PDFs para que la IA\ngenere flashcards automáticamente.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
+            ContentUnavailableView(
+                "Sin recursos todavía",
+                systemImage: "doc.badge.plus",
+                description: Text("Agrega apuntes o PDFs para que la IA genere flashcards automáticamente.")
+            )
+            .overlay(alignment: .bottom) {
                 Button {
                     viewModel.showingAddResource = true
                 } label: {
                     Label("Agregar recurso", systemImage: "plus")
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 13)
-                        .background(Color.indigo)
-                        .cornerRadius(13)
                 }
+                .buttonStyle(AeroPrimaryButtonStyle())
+                .padding(.horizontal, 40)
+                .padding(.bottom, 34)
             }
-            .padding(.horizontal, 40)
-            .frame(maxHeight: .infinity)
         } else {
             ScrollView {
                 LazyVStack(spacing: 10) {
@@ -242,43 +224,41 @@ struct ResourceCardView: View {
     let resource: SDResource
 
     var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.indigo.opacity(0.1))
-                    .frame(width: 46, height: 46)
-                Image(systemName: resource.sourceName?.lowercased().hasSuffix(".pdf") == true
-                      ? "doc.richtext" : "doc.text")
-                    .font(.title3)
-                    .foregroundColor(.indigo)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(resource.title)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                Text(resource.content)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-                if let src = resource.sourceName {
-                    Label(src, systemImage: "paperclip")
-                        .font(.caption2)
-                        .foregroundColor(.indigo)
+        AeroSurfaceCard {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.indigo.opacity(0.1))
+                        .frame(width: 46, height: 46)
+                    Image(systemName: resource.sourceName?.lowercased().hasSuffix(".pdf") == true
+                          ? "doc.richtext" : "doc.text")
+                        .font(.title3)
+                        .foregroundStyle(.indigo)
                 }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(resource.title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(resource.content)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                    if let src = resource.sourceName {
+                        Label(src, systemImage: "paperclip")
+                            .font(.caption2)
+                            .foregroundStyle(.indigo)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundColor(.secondary)
         }
-        .padding(14)
-        .background(Color(uiColor: .systemBackground))
-        .cornerRadius(14)
-        .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
     }
 }
 
@@ -289,37 +269,20 @@ struct FlashcardsTab: View {
 
     var body: some View {
         if viewModel.flashcards.isEmpty {
-            VStack(spacing: 22) {
-                ZStack {
-                    Circle()
-                        .fill(LinearGradient(colors: [.purple.opacity(0.12), .indigo.opacity(0.08)],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .frame(width: 100, height: 100)
-                    Image(systemName: "rectangle.stack.badge.plus")
-                        .font(.system(size: 42))
-                        .foregroundStyle(LinearGradient(colors: [.purple, .indigo],
-                                                        startPoint: .top, endPoint: .bottom))
-                }
-                VStack(spacing: 8) {
-                    Text("Sin flashcards todavía")
-                        .font(.headline)
-                    Text("Genera tarjetas con IA a partir de tus recursos\no crea una manualmente.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
+            ContentUnavailableView(
+                "Sin flashcards todavía",
+                systemImage: "rectangle.stack.badge.plus",
+                description: Text("Genera tarjetas con IA a partir de tus recursos o crea una manualmente.")
+            )
+            .overlay(alignment: .bottom) {
                 HStack(spacing: 12) {
                     Button {
                         viewModel.showingGenerateFlashcards = true
                     } label: {
                         Label("Con IA", systemImage: "wand.and.stars")
                             .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(Color.purple)
-                            .cornerRadius(12)
                     }
+                    .buttonStyle(AeroPrimaryButtonStyle(disabled: viewModel.resources.isEmpty))
                     .disabled(viewModel.resources.isEmpty)
 
                     Button {
@@ -327,17 +290,14 @@ struct FlashcardsTab: View {
                     } label: {
                         Label("Manual", systemImage: "pencil")
                             .fontWeight(.semibold)
-                            .foregroundColor(.indigo)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(Color.indigo.opacity(0.1))
-                            .cornerRadius(12)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.indigo.opacity(0.75))
                     .disabled(viewModel.resources.isEmpty)
                 }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 34)
             }
-            .padding(.horizontal, 40)
-            .frame(maxHeight: .infinity)
         } else {
             ScrollView {
                 LazyVStack(spacing: 10) {
@@ -357,78 +317,75 @@ struct FlashcardItemView: View {
     @State private var isExpanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(card.type == .open ? Color.indigo : Color.purple)
-                    .frame(width: 3)
-                    .padding(.vertical, 2)
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) { isExpanded.toggle() }
+        } label: {
+            AeroSurfaceCard {
+                HStack(alignment: .top, spacing: 12) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(card.type == .open ? Color.indigo : Color.purple)
+                        .frame(width: 3)
+                        .padding(.vertical, 2)
 
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text(card.type == .open ? "Abierta" : "Opción múltiple")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .foregroundColor(card.type == .open ? .indigo : .purple)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background((card.type == .open ? Color.indigo : Color.purple).opacity(0.1))
-                            .cornerRadius(6)
-
-                        Spacer()
-
-                        if card.intervalDays > 0 {
-                            Label("en \(card.intervalDays)d", systemImage: "clock")
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(card.type == .open ? "Abierta" : "Opción múltiple")
                                 .font(.caption2)
-                                .foregroundColor(.secondary)
+                                .fontWeight(.medium)
+                                .foregroundStyle(card.type == .open ? .indigo : .purple)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background((card.type == .open ? Color.indigo : Color.purple).opacity(0.1))
+                                .clipShape(.rect(cornerRadius: 6))
+
+                            Spacer()
+
+                            if card.intervalDays > 0 {
+                                Label("en \(card.intervalDays)d", systemImage: "clock")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
-                    }
 
-                    Text(card.question)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .lineLimit(isExpanded ? nil : 2)
-
-                    if isExpanded {
-                        Divider().padding(.vertical, 2)
-
-                        Text(card.answer)
+                        Text(card.question)
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .fontWeight(.medium)
+                            .lineLimit(isExpanded ? nil : 2)
 
-                        if !card.conceptTags.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 6) {
-                                    ForEach(card.conceptTags, id: \.self) { tag in
-                                        Text("#\(tag)")
-                                            .font(.caption2)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 3)
-                                            .background(Color.teal.opacity(0.1))
-                                            .foregroundColor(.teal)
-                                            .cornerRadius(6)
+                        if isExpanded {
+                            Divider().padding(.vertical, 2)
+
+                            Text(card.answer)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+
+                            if !card.conceptTags.isEmpty {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 6) {
+                                        ForEach(card.conceptTags, id: \.self) { tag in
+                                            Text("#\(tag)")
+                                                .font(.caption2)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 3)
+                                                .background(Color.teal.opacity(0.1))
+                                                .foregroundStyle(.teal)
+                                                .clipShape(.rect(cornerRadius: 6))
+                                        }
                                     }
                                 }
+                                .padding(.top, 2)
                             }
-                            .padding(.top, 2)
                         }
                     }
-                }
 
-                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .padding(.top, 3)
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 3)
+                }
             }
-            .padding(14)
         }
-        .background(Color(uiColor: .systemBackground))
-        .cornerRadius(14)
-        .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation(.spring(response: 0.3)) { isExpanded.toggle() }
-        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -446,39 +403,37 @@ struct ProgressTab: View {
             ScrollView {
                 VStack(spacing: 14) {
                     // Accuracy card
-                    HStack(spacing: 20) {
-                        ZStack {
-                            Circle()
-                                .stroke(Color.gray.opacity(0.15), lineWidth: 10)
-                                .frame(width: 90, height: 90)
-                            Circle()
-                                .trim(from: 0, to: CGFloat(acc))
-                                .stroke(
-                                    LinearGradient(colors: [.indigo, .teal],
-                                                   startPoint: .leading, endPoint: .trailing),
-                                    style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                                )
-                                .frame(width: 90, height: 90)
-                                .rotationEffect(.degrees(-90))
-                                .animation(.easeOut(duration: 0.8), value: acc)
-                            Text("\(Int(acc * 100))%")
-                                .font(.title3)
-                                .fontWeight(.bold)
-                        }
+                    AeroSurfaceCard {
+                        HStack(spacing: 20) {
+                            ZStack {
+                                Circle()
+                                    .stroke(Color.gray.opacity(0.15), lineWidth: 10)
+                                    .frame(width: 90, height: 90)
+                                Circle()
+                                    .trim(from: 0, to: CGFloat(acc))
+                                    .stroke(
+                                        LinearGradient(colors: [.indigo, .teal],
+                                                       startPoint: .leading, endPoint: .trailing),
+                                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                                    )
+                                    .frame(width: 90, height: 90)
+                                    .rotationEffect(.degrees(-90))
+                                    .animation(.easeOut(duration: 0.8), value: acc)
+                                Text("\(Int(acc * 100))%")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                            }
 
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Precisión general")
-                                .font(.headline)
-                            StatRow(label: "Total", value: "\(totalAtt)")
-                            StatRow(label: "Aciertos", value: "\(correctAtt)", color: .green)
-                            StatRow(label: "Errores", value: "\(totalAtt - correctAtt)", color: .red)
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Precisión general")
+                                    .font(.headline)
+                                StatRow(label: "Total", value: "\(totalAtt)")
+                                StatRow(label: "Aciertos", value: "\(correctAtt)", color: .green)
+                                StatRow(label: "Errores", value: "\(totalAtt - correctAtt)", color: .red)
+                            }
+                            Spacer()
                         }
-                        Spacer()
                     }
-                    .padding(18)
-                    .background(Color(uiColor: .systemBackground))
-                    .cornerRadius(16)
-                    .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 3)
 
                     if !gaps.gaps.isEmpty {
                         ProgressSectionHeader(title: "Conceptos débiles",
@@ -545,27 +500,25 @@ struct GapCardView: View {
     let gap: ConceptGap
 
     var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle().fill(Color.orange.opacity(0.12)).frame(width: 44, height: 44)
-                Text("\(Int(gap.error_rate * 100))%")
-                    .font(.caption).fontWeight(.bold).foregroundColor(.orange)
-            }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(gap.concept).font(.subheadline).fontWeight(.medium)
-                Text("\(gap.errors) errores de \(gap.total_attempts) intentos · \(gap.trend)")
-                    .font(.caption2).foregroundColor(.secondary)
-                if let det = gap.dominant_error_type {
-                    Text("Error principal: \(det.rawValue)")
-                        .font(.caption2).foregroundColor(.orange.opacity(0.8))
+        AeroSurfaceCard {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle().fill(Color.orange.opacity(0.12)).frame(width: 44, height: 44)
+                    Text("\(Int(gap.error_rate * 100))%")
+                        .font(.caption).fontWeight(.bold).foregroundStyle(.orange)
                 }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(gap.concept).font(.subheadline).fontWeight(.medium)
+                    Text("\(gap.errors) errores de \(gap.total_attempts) intentos · \(gap.trend)")
+                        .font(.caption2).foregroundStyle(.secondary)
+                    if let det = gap.dominant_error_type {
+                        Text("Error principal: \(det.rawValue)")
+                            .font(.caption2).foregroundStyle(.orange.opacity(0.8))
+                    }
+                }
+                Spacer()
             }
-            Spacer()
         }
-        .padding(14)
-        .background(Color(uiColor: .systemBackground))
-        .cornerRadius(14)
-        .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
     }
 }
 
@@ -573,23 +526,21 @@ struct StrongConceptCardView: View {
     let concept: StrongConcept
 
     var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle().fill(Color.green.opacity(0.12)).frame(width: 44, height: 44)
-                Image(systemName: "checkmark").font(.subheadline).fontWeight(.bold).foregroundColor(.green)
+        AeroSurfaceCard {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle().fill(Color.green.opacity(0.12)).frame(width: 44, height: 44)
+                    Image(systemName: "checkmark").font(.subheadline).fontWeight(.bold).foregroundStyle(.green)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(concept.concept).font(.subheadline).fontWeight(.medium)
+                    Text("\(concept.total_attempts) intentos · \(Int(concept.error_rate * 100))% error")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
             }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(concept.concept).font(.subheadline).fontWeight(.medium)
-                Text("\(concept.total_attempts) intentos · \(Int(concept.error_rate * 100))% error")
-                    .font(.caption2).foregroundColor(.secondary)
-            }
-            Spacer()
-            Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
         }
-        .padding(14)
-        .background(Color(uiColor: .systemBackground))
-        .cornerRadius(14)
-        .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
     }
 }
 

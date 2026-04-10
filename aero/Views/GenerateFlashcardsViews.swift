@@ -1,6 +1,164 @@
 import SwiftUI
 import FoundationModels
 
+// MARK: - UI Building Blocks
+
+private struct AeroBackground: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color.indigo.opacity(0.18),
+                    Color.purple.opacity(0.10),
+                    Color(uiColor: .systemGroupedBackground)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            // Subtle glow blobs
+            Circle()
+                .fill(Color.indigo.opacity(0.10))
+                .frame(width: 260, height: 260)
+                .blur(radius: 28)
+                .offset(x: -140, y: -220)
+
+            Circle()
+                .fill(Color.purple.opacity(0.10))
+                .frame(width: 300, height: 300)
+                .blur(radius: 32)
+                .offset(x: 170, y: -140)
+        }
+    }
+}
+
+private struct AeroCard<Content: View>: View {
+    let content: Content
+    init(@ViewBuilder content: () -> Content) { self.content = content() }
+
+    var body: some View {
+        content
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.22), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.06), radius: 16, y: 8)
+            )
+    }
+}
+
+private struct SectionHeader<Trailing: View>: View {
+    let title: String
+    let systemImage: String
+    @ViewBuilder var trailing: () -> Trailing
+
+    init(_ title: String, systemImage: String, @ViewBuilder trailing: @escaping () -> Trailing) {
+        self.title = title
+        self.systemImage = systemImage
+        self.trailing = trailing
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+                .labelStyle(.titleAndIcon)
+                .symbolRenderingMode(.hierarchical)
+
+            Spacer(minLength: 8)
+
+            trailing()
+        }
+        .textCase(nil)
+        .foregroundStyle(.primary)
+        .padding(.top, 6)
+        .padding(.bottom, 2)
+    }
+}
+
+private struct CountPill: View {
+    let count: Int
+    var body: some View {
+        Text("\(count) seleccionado\(count == 1 ? "" : "s")")
+            .font(.caption)
+            .fontWeight(.semibold)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.thinMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.22), lineWidth: 1))
+            .contentTransition(.numericText())
+    }
+}
+
+private struct ResourceSelectionRow: View {
+    let title: String
+    let preview: String
+    @Binding var isSelected: Bool
+
+    @State private var highlight = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .font(.title3)
+                .foregroundStyle(isSelected ? Color.indigo : Color.secondary)
+                .symbolRenderingMode(.hierarchical)
+                .contentTransition(.symbolEffect(.replace))
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(.headline)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.95)
+
+                Text(preview)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+            }
+
+            Spacer(minLength: 8)
+
+            Toggle("", isOn: $isSelected)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .tint(.indigo)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(isSelected ? Color.indigo.opacity(0.08) : Color.clear)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(isSelected ? Color.indigo.opacity(0.22) : Color.white.opacity(0.12), lineWidth: 1)
+                )
+        )
+        .scaleEffect(highlight ? 0.985 : 1.0)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isSelected)
+        .onChange(of: isSelected) { _, newValue in
+            if newValue {
+                highlight = true
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(120))
+                    highlight = false
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(isSelected ? "Seleccionado" : "No seleccionado")
+        .accessibilityHint("Activa el interruptor para incluir este recurso.")
+    }
+}
+
 // MARK: - Generation Progress Overlay
 
 struct GenerationProgressOverlay: View {
@@ -125,82 +283,184 @@ struct GenerateFlashcardsSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                AeroBackground()
+
                 List {
                     Section {
-                        if IntelligentStudyAssistant.isAppleIntelligenceReady {
-                            Label("Apple Intelligence activa (on-device)", systemImage: "apple.intelligence")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        } else {
-                            VStack(alignment: .leading, spacing: 8) {
-                                let reason = IntelligentStudyAssistant.unavailabilityReason
-                                if reason == .modelNotReady {
-                                    Label("Modelo descargándose...", systemImage: "arrow.down.circle")
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.orange)
-                                    Text("El modelo de Apple Intelligence se está descargando. Ve a Ajustes → Apple Intelligence y Siri y espera a que termine. Si estás en el simulador, la descarga ocurre en tu Mac host (requiere Apple Silicon).")
+                        AeroCard {
+                            if IntelligentStudyAssistant.isAppleIntelligenceReady {
+                                HStack(alignment: .center, spacing: 12) {
+                                    Image(systemName: "apple.intelligence")
+                                        .font(.title3)
+                                        .foregroundStyle(
+                                            LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                        )
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Apple Intelligence activa")
+                                            .font(.headline)
+                                        Text("Generación on-device (más rápida y privada).")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer(minLength: 8)
+                                    Text("OK")
                                         .font(.caption)
-                                        .foregroundColor(.secondary)
-                                } else {
-                                    Label("Apple Intelligence no disponible", systemImage: "exclamationmark.triangle.fill")
                                         .fontWeight(.semibold)
-                                        .foregroundColor(.red)
-                                    Text(IntelligentStudyAssistant.unavailabilityReasonDescription())
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(Color.green.opacity(0.14), in: Capsule())
+                                        .foregroundStyle(.green)
+                                }
+                            } else {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    let reason = IntelligentStudyAssistant.unavailabilityReason
+                                    if reason == .modelNotReady {
+                                        Label("Modelo descargándose…", systemImage: "arrow.down.circle")
+                                            .font(.headline)
+                                            .foregroundStyle(.orange)
+                                        Text("Ve a Ajustes → Apple Intelligence y Siri y espera a que termine. En simulador, la descarga ocurre en tu Mac host (requiere Apple Silicon).")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    } else {
+                                        Label("Apple Intelligence no disponible", systemImage: "exclamationmark.triangle.fill")
+                                            .font(.headline)
+                                            .foregroundStyle(.red)
+                                        Text(IntelligentStudyAssistant.unavailabilityReasonDescription())
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
                             }
-                            .padding(.vertical, 4)
                         }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                        .listRowBackground(Color.clear)
                     } header: {
-                        Text("Motor de IA")
+                        SectionHeader("Motor de IA", systemImage: "cpu") { EmptyView() }
                     }
 
                     Section {
-                        Picker("Cantidad", selection: $depth) {
-                            Text("Pocas (~6)").tag(IntelligentStudyAssistant.Depth.low)
-                            Text("Media (~12)").tag(IntelligentStudyAssistant.Depth.medium)
-                            Text("Muchas (~18)").tag(IntelligentStudyAssistant.Depth.high)
+                        AeroCard {
+                            HStack(alignment: .center, spacing: 12) {
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(.title3)
+                                    .foregroundStyle(.secondary)
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Cantidad orientativa")
+                                        .font(.headline)
+                                    Picker("Cantidad", selection: $depth) {
+                                        Text("Pocas").tag(IntelligentStudyAssistant.Depth.low)
+                                        Text("Media").tag(IntelligentStudyAssistant.Depth.medium)
+                                        Text("Muchas").tag(IntelligentStudyAssistant.Depth.high)
+                                    }
+                                    .pickerStyle(.segmented)
+                                }
+                            }
                         }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                     } header: {
-                        Text("Cantidad orientativa")
+                        SectionHeader("Ajustes", systemImage: "gearshape") { EmptyView() }
+                    } footer: {
+                        Text(depth == .low ? "Ideal para un repaso rápido." : (depth == .medium ? "Equilibrado para estudiar." : "Más cobertura, tarda un poco más."))
                     }
 
                     Section {
-                        if viewModel.resources.isEmpty {
-                            Text("Añade al menos un recurso con texto.")
-                                .foregroundColor(.secondary)
-                        } else {
-                            ForEach(viewModel.resources) { r in
-                                Toggle(isOn: Binding(
+                        ForEach(viewModel.resources) { r in
+                            ResourceSelectionRow(
+                                title: r.title,
+                                preview: String(r.content.prefix(120)) + (r.content.count > 120 ? "…" : ""),
+                                isSelected: Binding(
                                     get: { selectedIds.contains(r.id) },
                                     set: { on in
-                                        if on { selectedIds.insert(r.id) } else { selectedIds.remove(r.id) }
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                            if on { selectedIds.insert(r.id) } else { selectedIds.remove(r.id) }
+                                        }
                                     }
-                                )) {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(r.title).font(.headline)
-                                        Text(String(r.content.prefix(80)) + (r.content.count > 80 ? "…" : ""))
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                            }
+                                )
+                            )
+                            .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
                         }
                     } header: {
-                        Text("Recursos")
+                        SectionHeader("Recursos", systemImage: "books.vertical") {
+                            CountPill(count: selectedIds.count)
+                        }
+                    } footer: {
+                        Text("Selecciona 1 o más recursos. Cuanto mejor sea el texto, mejores serán las tarjetas.")
                     }
 
                     if let generationError {
                         Section {
-                            Text(generationError)
-                                .font(.caption)
-                                .foregroundColor(.red)
+                            AeroCard {
+                                HStack(alignment: .top, spacing: 12) {
+                                    Image(systemName: "xmark.octagon.fill")
+                                        .foregroundStyle(.red)
+                                        .font(.title3)
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text("No se pudo generar")
+                                            .font(.headline)
+                                        Text(generationError)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                }
+                            }
+                            .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
                         }
                     }
                 }
+                .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
+                .overlay {
+                    if viewModel.resources.isEmpty {
+                        ContentUnavailableView(
+                            "Sin recursos",
+                            systemImage: "doc.text.magnifyingglass",
+                            description: Text("Añade al menos un recurso con texto para generar flashcards.")
+                        )
+                        .padding(.horizontal, 24)
+                    }
+                }
+                .safeAreaInset(edge: .bottom) {
+                    // Bottom primary action (modern “sticky” CTA)
+                    VStack(spacing: 10) {
+                        Button {
+                            Task { await runGeneration() }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: canGenerate ? "sparkles" : "sparkles.slash")
+                                    .symbolRenderingMode(.hierarchical)
+                                Text(isGenerating ? "Generando…" : "Generar flashcards")
+                                    .fontWeight(.semibold)
+                                Spacer()
+                                Text(depth == .low ? "~6" : (depth == .medium ? "~12" : "~18"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(canGenerate ? AnyShapeStyle(LinearGradient(colors: [.indigo, .purple], startPoint: .leading, endPoint: .trailing)) : AnyShapeStyle(Color.gray.opacity(0.25)))
+                            )
+                            .foregroundStyle(canGenerate ? .white : .secondary)
+                            .shadow(color: canGenerate ? .purple.opacity(0.25) : .clear, radius: 16, y: 8)
+                        }
+                        .disabled(!canGenerate)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 10)
+                    .background(.ultraThinMaterial)
+                }
                 .allowsHitTesting(!isGenerating)
                 .blur(radius: isGenerating ? 4 : 0)
+                .sensoryFeedback(.selection, trigger: selectedIds.count)
 
                 // Progress overlay
                 if isGenerating {
@@ -215,8 +475,6 @@ struct GenerateFlashcardsSheet: View {
                     .transition(.scale(scale: 0.85).combined(with: .opacity))
                 }
             }
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isGenerating)
-            .animation(.easeInOut(duration: 0.5), value: generationProgress)
             .navigationTitle("Generar flashcards")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear { IntelligentStudyAssistant.prewarm() }
@@ -226,10 +484,11 @@ struct GenerateFlashcardsSheet: View {
                         .disabled(isGenerating)
                 }
                 ToolbarItem(placement: .confirmationAction) {
+                    // Keep an accessible top action too (especially on iPad / keyboard)
                     Button {
                         Task { await runGeneration() }
                     } label: {
-                        Text("Generar con IA")
+                        Label("Generar", systemImage: "sparkles")
                     }
                     .disabled(!canGenerate)
                 }
@@ -313,33 +572,80 @@ struct ReviewGeneratedFlashcardsView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        List {
-            if let errorMessage {
-                Section {
-                    Text(errorMessage).foregroundColor(.red).font(.caption)
-                }
-            }
-            ForEach($drafts) { $card in
-                Section {
-                    Toggle("Incluir al guardar", isOn: $card.isIncluded)
-                    TextField("Pregunta", text: $card.question, axis: .vertical)
-                    TextField("Respuesta", text: $card.answer, axis: .vertical)
-                    TextField("Tags (separados por coma)", text: Binding(
-                        get: { card.conceptTags.joined(separator: ", ") },
-                        set: {
-                            card.conceptTags = $0
-                                .split(separator: ",")
-                                .map { $0.trimmingCharacters(in: .whitespaces) }
-                                .filter { !$0.isEmpty }
+        ZStack {
+            AeroBackground()
+
+            List {
+                if let errorMessage {
+                    Section {
+                        AeroCard {
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.red)
+                                    .font(.title3)
+                                    .accessibilityHidden(true)
+                                Text(errorMessage)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                            }
                         }
-                    ))
-                } header: {
-                    Text(card.type == .open ? "Abierta" : "Opción múltiple")
+                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                    }
                 }
+
+                ForEach($drafts) { $card in
+                    Section {
+                        AeroCard {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(spacing: 10) {
+                                    Image(systemName: card.type == .open ? "text.bubble" : "list.bullet.circle")
+                                        .foregroundStyle(
+                                            LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                        )
+                                        .symbolRenderingMode(.hierarchical)
+                                        .accessibilityHidden(true)
+                                    Text(card.type == .open ? "Abierta" : "Opción múltiple")
+                                        .font(.headline)
+                                    Spacer()
+                                    Toggle("Incluir", isOn: $card.isIncluded)
+                                        .labelsHidden()
+                                        .tint(.indigo)
+                                }
+
+                                VStack(alignment: .leading, spacing: 10) {
+                                    TextField("Pregunta", text: $card.question, axis: .vertical)
+                                        .textFieldStyle(.roundedBorder)
+
+                                    TextField("Respuesta", text: $card.answer, axis: .vertical)
+                                        .textFieldStyle(.roundedBorder)
+
+                                    TextField("Tags (coma)", text: Binding(
+                                        get: { card.conceptTags.joined(separator: ", ") },
+                                        set: {
+                                            card.conceptTags = $0
+                                                .split(separator: ",")
+                                                .map { $0.trimmingCharacters(in: .whitespaces) }
+                                                .filter { !$0.isEmpty }
+                                        }
+                                    ))
+                                    .textFieldStyle(.roundedBorder)
+                                }
+                            }
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                    }
+                }
+                .onDelete { drafts.remove(atOffsets: $0) }
             }
-            .onDelete { drafts.remove(atOffsets: $0) }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
         }
-        .navigationTitle("Revisar antes de guardar")
+        .navigationTitle("Revisar y guardar")
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Guardar todas") {

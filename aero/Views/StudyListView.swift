@@ -8,14 +8,14 @@ struct StudyListView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
+                AeroAppBackground()
 
                 if viewModel.isLoading && viewModel.rows.isEmpty {
                     VStack(spacing: 16) {
                         ProgressView().scaleEffect(1.2)
                         Text("Cargando estudios...")
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                     }
                 } else if viewModel.rows.isEmpty {
                     EmptyStudiesView { viewModel.showingCreateStudy = true }
@@ -87,36 +87,32 @@ struct StudyStatsBanner: View {
     let count: Int
 
     var body: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("¡A estudiar!")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                Text("\(count) tema\(count == 1 ? "" : "s") activo\(count == 1 ? "" : "s")")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
-            ZStack {
-                Circle()
-                    .fill(LinearGradient(
-                        colors: [Color.indigo.opacity(0.18), Color.purple.opacity(0.12)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    .frame(width: 54, height: 54)
-                Text("\(count)")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.indigo)
+        AeroSurfaceCard {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("¡A estudiar!")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                    Text("\(count) tema\(count == 1 ? "" : "s") activo\(count == 1 ? "" : "s")")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(
+                            colors: [Color.indigo.opacity(0.18), Color.purple.opacity(0.12)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 54, height: 54)
+                    Text("\(count)")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.indigo)
+                }
             }
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(uiColor: .systemBackground))
-                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 3)
-        )
     }
 }
 
@@ -126,92 +122,91 @@ struct StudyCardView: View {
     let row: StudyRowModel
 
     var body: some View {
-        HStack(spacing: 0) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(LinearGradient(
-                    colors: [Color.indigo, Color.purple],
-                    startPoint: .top,
-                    endPoint: .bottom
-                ))
-                .frame(width: 4)
-                .padding(.vertical, 14)
+        AeroSurfaceCard {
+            HStack(spacing: 0) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(LinearGradient(
+                        colors: [Color.indigo, Color.purple],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ))
+                    .frame(width: 4)
+                    .padding(.vertical, 14)
 
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text(row.study.title)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Text(row.study.desc)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-
-                if let acc = row.accuracy {
-                    let tint: Color = acc >= 0.7 ? .green : acc >= 0.4 ? .orange : .red
-                    ProgressView(value: acc) {
-                        HStack {
-                            Text("Precisión")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text("\(Int(acc * 100))%")
-                                .font(.caption2)
-                                .fontWeight(.semibold)
-                                .foregroundColor(tint)
-                        }
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text(row.study.title)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .tint(tint)
-                }
 
-                HStack(spacing: 8) {
-                    if row.pendingReviewCount > 0 {
-                        Label(
-                            "\(row.pendingReviewCount) pendiente\(row.pendingReviewCount == 1 ? "" : "s")",
-                            systemImage: "rectangle.stack.fill"
-                        )
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.orange.opacity(0.12))
-                        .foregroundColor(.orange)
-                        .cornerRadius(8)
-                    } else {
-                        Label("Al día", systemImage: "checkmark.circle.fill")
+                    Text(row.study.desc)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+
+                    if let acc = row.accuracy {
+                        let tint: Color = acc >= 0.7 ? .green : acc >= 0.4 ? .orange : .red
+                        ProgressView(value: acc) {
+                            HStack {
+                                Text("Precisión")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text("\(Int(acc * 100))%")
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(tint)
+                            }
+                        }
+                        .tint(tint)
+                    }
+
+                    HStack(spacing: 8) {
+                        if row.pendingReviewCount > 0 {
+                            Label(
+                                "\(row.pendingReviewCount) pendiente\(row.pendingReviewCount == 1 ? "" : "s")",
+                                systemImage: "rectangle.stack.fill"
+                            )
                             .font(.caption2)
                             .fontWeight(.medium)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Color.green.opacity(0.1))
-                            .foregroundColor(.green)
+                            .background(Color.orange.opacity(0.12))
+                            .foregroundStyle(.orange)
                             .cornerRadius(8)
-                    }
+                        } else {
+                            Label("Al día", systemImage: "checkmark.circle.fill")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.green.opacity(0.1))
+                                .foregroundStyle(.green)
+                                .cornerRadius(8)
+                        }
 
-                    Spacer()
+                        Spacer()
 
-                    if let last = row.lastPractice {
-                        Text(last.formatted(date: .abbreviated, time: .omitted))
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text(row.study.createdAt.formatted(.dateTime.day().month().year()))
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                        if let last = row.lastPractice {
+                            Text(last.formatted(date: .abbreviated, time: .omitted))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text(row.study.createdAt.formatted(.dateTime.day().month().year()))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
         }
-        .background(Color(uiColor: .systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 3)
     }
 }
 
@@ -221,48 +216,43 @@ struct EmptyStudiesView: View {
     let action: () -> Void
 
     var body: some View {
-        VStack(spacing: 24) {
-            ZStack {
-                Circle()
-                    .fill(LinearGradient(
-                        colors: [Color.indigo.opacity(0.1), Color.purple.opacity(0.07)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    .frame(width: 120, height: 120)
-                Image(systemName: "books.vertical")
-                    .font(.system(size: 48))
-                    .foregroundStyle(
-                        LinearGradient(colors: [.indigo, .purple],
-                                       startPoint: .top, endPoint: .bottom)
-                    )
-            }
+        AeroSurfaceCard {
+            VStack(spacing: 24) {
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(
+                            colors: [Color.indigo.opacity(0.1), Color.purple.opacity(0.07)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 120, height: 120)
+                    Image(systemName: "books.vertical")
+                        .font(.system(size: 48))
+                        .foregroundStyle(
+                            LinearGradient(colors: [.indigo, .purple],
+                                           startPoint: .top, endPoint: .bottom)
+                        )
+                }
 
-            VStack(spacing: 8) {
-                Text("Empieza tu primer estudio")
-                    .font(.title3)
-                    .fontWeight(.bold)
-                Text("Crea un tema, agrega recursos y deja que\nla IA genere tus flashcards.")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-            }
+                VStack(spacing: 8) {
+                    Text("Empieza tu primer estudio")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    Text("Crea un tema, agrega recursos y deja que\nla IA genere tus flashcards.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
 
-            Button(action: action) {
-                Label("Crear primer estudio", systemImage: "plus")
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 14)
-                    .background(
-                        LinearGradient(colors: [.indigo, .purple],
-                                       startPoint: .leading, endPoint: .trailing)
-                    )
-                    .cornerRadius(14)
-                    .shadow(color: .indigo.opacity(0.35), radius: 8, x: 0, y: 4)
+                Button(action: action) {
+                    Label("Crear primer estudio", systemImage: "plus")
+                        .fontWeight(.semibold)
+                }
+                .buttonStyle(AeroPrimaryButtonStyle())
             }
         }
         .padding(.horizontal, 40)
+        .padding(.vertical, 20)
     }
 }
 

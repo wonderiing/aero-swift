@@ -10,20 +10,47 @@ struct ResourceDetailView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        Form {
-            Section("Título") {
-                TextField("Título", text: $title)
-            }
-            Section("Contenido") {
-                TextEditor(text: $content)
-                    .frame(minHeight: 220)
-            }
-            if let errorMessage {
-                Section {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                        .font(.caption)
+        ZStack {
+            AeroAppBackground()
+
+            ScrollView {
+                VStack(spacing: 14) {
+                    AeroSurfaceCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Label("Título", systemImage: "textformat")
+                                .font(.headline)
+                            TextField("Título", text: $title)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                    }
+
+                    AeroSurfaceCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Label("Contenido", systemImage: "doc.text")
+                                .font(.headline)
+                            TextEditor(text: $content)
+                                .frame(minHeight: 240)
+                                .padding(8)
+                                .background(Color(uiColor: .systemBackground).opacity(0.55))
+                                .clipShape(.rect(cornerRadius: 12))
+                        }
+                    }
+
+                    if let errorMessage {
+                        AeroSurfaceCard {
+                            HStack(spacing: 10) {
+                                Image(systemName: "xmark.octagon.fill")
+                                    .foregroundStyle(.red)
+                                Text(errorMessage)
+                                    .foregroundStyle(.red)
+                                    .font(.caption)
+                                Spacer()
+                            }
+                        }
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
             }
         }
         .navigationTitle("Recurso")
