@@ -151,6 +151,9 @@ enum IntelligentStudyAssistant {
         chunkIndex: Int,
         totalChunks: Int
     ) async throws -> [EditableFlashcard] {
+        let rawNeeds = UserDefaults.standard.string(forKey: "accessibilityNeeds") ?? ""
+        let needs = Set(rawNeeds.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+
         let instructions = Instructions {
             "Eres un docente experto en diseño instruccional. Tu objetivo es crear flashcards que desarrollen comprensión profunda, no memorización superficial."
             "REGLAS DE CALIDAD:"
@@ -160,6 +163,9 @@ enum IntelligentStudyAssistant {
             "4. La respuesta modelo debe ser didáctica: incluye el 'por qué' o el mecanismo, no solo el dato."
             "OBLIGATORIO: mezcla cardKind. Al menos el 50% deben ser 'open'. Alterna explícitamente entre tipos; nunca generes solo 'multiple_choice'."
             "sourceResourceTitle debe ser copia exacta del título del recurso en la lista RECURSOS."
+            if needs.contains("dyslexia") {
+                "IMPORTANTE (Dislexia): las preguntas deben ser cortas y directas. Evita oraciones compuestas largas."
+            }
         }
 
         let session = LanguageModelSession(instructions: instructions)
@@ -328,6 +334,125 @@ enum IntelligentStudyAssistant {
         return results
     }
 
+    // MARK: - Generación desde lagunas de conocimiento
+
+    /// Genera flashcards enfocadas en los conceptos débiles detectados por el gap analysis.
+    static func generateFlashcardsFromGaps(
+        gaps: [ConceptGap],
+        resources: [(id: UUID, title: String, content: String)],
+        onProgress: (@Sendable (GenerationProgress) -> Void)? = nil
+    ) async throws -> [EditableFlashcard] {
+        guard !gaps.isEmpty else { return [] }
+
+        if !isAppleIntelligenceReady {
+            fmLog("generateFromGaps", "⏳ Modelo no listo, esperando hasta 10s...")
+            let ready = await waitForModelReadiness(timeout: 10)
+            if !ready {
+                throw StudyAIError.modelUnavailable(unavailabilityReasonDescription())
+            }
+        }
+
+        let conceptList = gaps.prefix(5).map { gap -> String in
+            var line = "- \(gap.concept) (tasa de error: \(Int(gap.error_rate * 100))%"
+            if let errorType = gap.dominant_error_type {
+                line += ", tipo de error: \(errorType.rawValue)"
+            }
+            line += ")"
+            return line
+        }.joined(separator: "\n")
+
+        let titleToId = Dictionary(uniqueKeysWithValues: resources.map { ($0.title, $0.id) })
+        let maxCharsPerChunk = 1_500
+        let chunks = buildMaterialChunks(resources: resources, maxCharsPerChunk: maxCharsPerChunk)
+
+        fmLog("generateFromGaps", "→ \(gaps.prefix(5).count) lagunas, chunks=\(chunks.count)")
+
+        var allCards: [EditableFlashcard] = []
+        var firstError: Error?
+
+        for (idx, chunk) in chunks.enumerated() {
+            onProgress?(GenerationProgress(completedChunks: idx, totalChunks: chunks.count))
+            do {
+                let cards = try await generateChunkForGaps(
+                    chunk: chunk,
+                    conceptList: conceptList,
+                    titleToId: titleToId,
+                    fallbackResourceId: resources.first?.id,
+                    chunkIndex: idx,
+                    totalChunks: chunks.count
+                )
+                allCards.append(contentsOf: cards)
+            } catch {
+                fmLog("generateFromGaps", "  ⚠️ chunk \(idx+1) falló: \(error.localizedDescription)")
+                if firstError == nil { firstError = error }
+            }
+        }
+
+        onProgress?(GenerationProgress(completedChunks: chunks.count, totalChunks: chunks.count))
+
+        if allCards.isEmpty, let err = firstError { throw err }
+        fmLog("generateFromGaps", "✅ Total: \(allCards.count) tarjetas para lagunas")
+        return allCards
+    }
+
+    private static func generateChunkForGaps(
+        chunk: MaterialChunk,
+        conceptList: String,
+        titleToId: [String: UUID],
+        fallbackResourceId: UUID?,
+        chunkIndex: Int,
+        totalChunks: Int
+    ) async throws -> [EditableFlashcard] {
+        let instructions = Instructions {
+            "Eres un tutor experto en refuerzo de aprendizaje. Tu objetivo es crear flashcards para CORREGIR lagunas de conocimiento específicas del estudiante."
+            "REGLAS:"
+            "1. Cada tarjeta debe abordar directamente uno de los conceptos débiles listados."
+            "2. Prioriza preguntas que ataquen el tipo de error del estudiante: si el error es 'conceptual', pregunta por el mecanismo o definición correcta; si es 'confusion', compara conceptos; si es 'incompleto', pide elaborar el concepto completo."
+            "3. Mezcla tipos: al menos 50% abiertas ('open'). Las preguntas deben invitar a razonar, no solo a recordar."
+            "4. La respuesta modelo debe ser didáctica y corregir directamente el error típico."
+            "5. sourceResourceTitle debe ser copia exacta del título del recurso en la lista RECURSOS."
+        }
+
+        let session = LanguageModelSession(instructions: instructions)
+
+        let prompt: String
+        if totalChunks == 1 {
+            prompt = """
+            RECURSOS:
+            \(chunk.resourceList)
+
+            LAGUNAS DE CONOCIMIENTO DEL ESTUDIANTE (conceptos que necesita reforzar):
+            \(conceptList)
+
+            Genera 6 flashcards a partir del material, enfocadas en corregir las lagunas listadas.
+
+            MATERIAL:
+            \(chunk.material)
+            """
+        } else {
+            prompt = """
+            RECURSOS:
+            \(chunk.resourceList)
+
+            LAGUNAS DE CONOCIMIENTO DEL ESTUDIANTE (conceptos que necesita reforzar):
+            \(conceptList)
+
+            Fragmento \(chunkIndex + 1) de \(totalChunks). Genera 3 flashcards de este fragmento que aborden las lagunas.
+
+            MATERIAL:
+            \(chunk.material)
+            """
+        }
+
+        return try await executeGeneration(tag: "generateGapChunk[\(chunkIndex)]") {
+            try await session.respond(to: prompt, generating: GeneratedFlashcardChunk.self)
+        } transform: { response in
+            response.content.cards.compactMap {
+                mapGeneratedItem($0, titleToId: titleToId, fallbackResourceId: fallbackResourceId)
+            }
+        }
+    }
+
     // MARK: - Evaluación
 
     static func evaluateStudentAnswer(
@@ -344,6 +469,9 @@ enum IntelligentStudyAssistant {
             }
         }
 
+        let rawNeeds = UserDefaults.standard.string(forKey: "accessibilityNeeds") ?? ""
+        let needs = Set(rawNeeds.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+
         let instructions = Instructions {
             "Eres un tutor benevolente que evalúa respuestas de estudio en español."
             "PRINCIPIO FUNDAMENTAL: evalúas si el estudiante COMPRENDE el concepto, no si memorizó la redacción exacta."
@@ -354,6 +482,12 @@ enum IntelligentStudyAssistant {
             "2. ¿La respuesta es correcta pero le faltan ideas clave? → isCorrect=true, errorTypeToken=incompleto, lista missingConcepts."
             "3. ¿La respuesta es correcta y completa? → isCorrect=true, errorTypeToken vacío."
             "El feedback siempre debe ser constructivo y en español. Si es correcto, refuerza lo que hizo bien. Si es incompleto, explica qué faltó. Si es incorrecto, corrige con amabilidad."
+            if needs.contains("adhd") {
+                "IMPORTANTE (TDAH): el feedback debe ser breve, directo y comenzar reconociendo lo que el estudiante hizo bien antes de señalar errores."
+            }
+            if needs.contains("autism") {
+                "IMPORTANTE (Autismo): usa lenguaje directo y concreto. Evita metáforas, sarcasmo o lenguaje ambiguo. Di exactamente qué faltó."
+            }
         }
 
         let session = LanguageModelSession(instructions: instructions)

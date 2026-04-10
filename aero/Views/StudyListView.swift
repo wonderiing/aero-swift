@@ -5,6 +5,7 @@ struct StudyListView: View {
     @StateObject private var viewModel = StudyListViewModel()
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var showSettings = false
 
     private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
     private var contentWidth: CGFloat {
@@ -72,6 +73,14 @@ struct StudyListView: View {
             }
             .navigationTitle("Mis Estudios")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .accessibilityLabel("Configuración")
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         viewModel.showingCreateStudy = true
@@ -84,6 +93,11 @@ struct StudyListView: View {
             }
             .sheet(isPresented: $viewModel.showingCreateStudy) {
                 CreateStudyView(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showSettings) {
+                NavigationStack {
+                    SettingsView()
+                }
             }
             .onChange(of: viewModel.showingCreateStudy) { _, isPresented in
                 if !isPresented { viewModel.fetchStudies() }

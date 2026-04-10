@@ -1,0 +1,16 @@
+{
+  "source": "/Users/Alumno/Desktop/hackathon/aero/aero/Views/AppRootView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Configuración",
+        "location": {
+          "startingColumn": 41,
+          "startingLine": 82
+        }
+      }
+    ]
+  },
+  "version": 1
+}

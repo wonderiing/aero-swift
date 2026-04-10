@@ -7,7 +7,7 @@
         "key": "Sesión de Repaso",
         "location": {
           "startingColumn": 26,
-          "startingLine": 63
+          "startingLine": 87
         }
       },
       {
@@ -15,7 +15,7 @@
         "key": "Preparando sesión...",
         "location": {
           "startingColumn": 30,
-          "startingLine": 25
+          "startingLine": 41
         }
       },
       {
@@ -23,7 +23,7 @@
         "key": "Salir",
         "location": {
           "startingColumn": 24,
-          "startingLine": 68
+          "startingLine": 92
         }
       },
       {
@@ -31,7 +31,15 @@
         "key": "Tarjeta %lld de %lld",
         "location": {
           "startingColumn": 22,
-          "startingLine": 89
+          "startingLine": 115
+        }
+      },
+      {
+        "comment": "",
+        "key": "🔥 %lld",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 120
         }
       },
       {
@@ -39,23 +47,47 @@
         "key": "%lld%%",
         "location": {
           "startingColumn": 22,
-          "startingLine": 93
+          "startingLine": 126
+        }
+      },
+      {
+        "comment": "",
+        "key": "Racha %lld",
+        "location": {
+          "startingColumn": 45,
+          "startingLine": 124
         }
       },
       {
         "comment": "",
         "key": "Pregunta abierta",
         "location": {
-          "startingColumn": 48,
-          "startingLine": 125
+          "startingColumn": 52,
+          "startingLine": 165
         }
       },
       {
         "comment": "",
         "key": "Opción múltiple",
         "location": {
-          "startingColumn": 69,
-          "startingLine": 125
+          "startingColumn": 73,
+          "startingLine": 165
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reproducir audio de la pregunta",
+        "location": {
+          "startingColumn": 49,
+          "startingLine": 186
+        }
+      },
+      {
+        "comment": "",
+        "key": "Audio",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 181
         }
       },
       {
@@ -63,7 +95,7 @@
         "key": "Te faltó mencionar: %@.",
         "location": {
           "startingColumn": 26,
-          "startingLine": 220
+          "startingLine": 276
         }
       },
       {
@@ -71,7 +103,7 @@
         "key": "Correcto — incompleto",
         "location": {
           "startingColumn": 39,
-          "startingLine": 188
+          "startingLine": 244
         }
       },
       {
@@ -79,7 +111,7 @@
         "key": "Correcto",
         "location": {
           "startingColumn": 67,
-          "startingLine": 188
+          "startingLine": 244
         }
       },
       {
@@ -87,7 +119,7 @@
         "key": "Incorrecto",
         "location": {
           "startingColumn": 27,
-          "startingLine": 194
+          "startingLine": 250
         }
       },
       {
@@ -95,7 +127,7 @@
         "key": "Evaluado con Foundation Models",
         "location": {
           "startingColumn": 27,
-          "startingLine": 234
+          "startingLine": 290
         }
       },
       {
@@ -103,7 +135,7 @@
         "key": "Respuesta correcta",
         "location": {
           "startingColumn": 26,
-          "startingLine": 172
+          "startingLine": 228
         }
       },
       {
@@ -111,7 +143,7 @@
         "key": "Respuesta correcta",
         "location": {
           "startingColumn": 30,
-          "startingLine": 203
+          "startingLine": 259
         }
       },
       {
@@ -119,7 +151,7 @@
         "key": "Explicar más",
         "location": {
           "startingColumn": 31,
-          "startingLine": 243
+          "startingLine": 299
         }
       },
       {
@@ -127,7 +159,7 @@
         "key": "Tu respuesta",
         "location": {
           "startingColumn": 18,
-          "startingLine": 268
+          "startingLine": 329
         }
       },
       {
@@ -135,7 +167,7 @@
         "key": "Activa micrófono en Ajustes.",
         "location": {
           "startingColumn": 30,
-          "startingLine": 304
+          "startingLine": 369
         }
       },
       {
@@ -143,7 +175,7 @@
         "key": "Detener",
         "location": {
           "startingColumn": 52,
-          "startingLine": 294
+          "startingLine": 359
         }
       },
       {
@@ -151,7 +183,7 @@
         "key": "Dictar",
         "location": {
           "startingColumn": 64,
-          "startingLine": 294
+          "startingLine": 359
         }
       },
       {
@@ -159,7 +191,7 @@
         "key": "Siguiente Tarjeta",
         "location": {
           "startingColumn": 30,
-          "startingLine": 354
+          "startingLine": 419
         }
       },
       {
@@ -167,7 +199,7 @@
         "key": "Enviar (IA on-device)",
         "location": {
           "startingColumn": 87,
-          "startingLine": 370
+          "startingLine": 435
         }
       },
       {
@@ -175,7 +207,7 @@
         "key": "Enviar respuesta",
         "location": {
           "startingColumn": 113,
-          "startingLine": 370
+          "startingLine": 435
         }
       },
       {
@@ -183,7 +215,7 @@
         "key": "¡Sesión completada!",
         "location": {
           "startingColumn": 22,
-          "startingLine": 396
+          "startingLine": 461
         }
       },
       {
@@ -191,7 +223,7 @@
         "key": "Has respondido %lld tarjetas. Aciertos: %lld. El algoritmo SM-2 actualizará tus próximos repasos.",
         "location": {
           "startingColumn": 22,
-          "startingLine": 399
+          "startingLine": 464
         }
       },
       {
@@ -199,7 +231,7 @@
         "key": "Volver al estudio",
         "location": {
           "startingColumn": 22,
-          "startingLine": 407
+          "startingLine": 472
         }
       },
       {
@@ -207,7 +239,7 @@
         "key": "¡Estás al día!",
         "location": {
           "startingColumn": 22,
-          "startingLine": 426
+          "startingLine": 491
         }
       },
       {
@@ -215,7 +247,7 @@
         "key": "No tienes flashcards pendientes de repaso para este estudio ahora.",
         "location": {
           "startingColumn": 22,
-          "startingLine": 429
+          "startingLine": 494
         }
       },
       {
@@ -223,7 +255,7 @@
         "key": "Volver",
         "location": {
           "startingColumn": 24,
-          "startingLine": 433
+          "startingLine": 498
         }
       }
     ]

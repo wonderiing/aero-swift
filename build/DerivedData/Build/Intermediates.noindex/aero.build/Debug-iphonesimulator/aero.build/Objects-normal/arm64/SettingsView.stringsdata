@@ -1,0 +1,152 @@
+{
+  "source": "/Users/Alumno/Desktop/hackathon/aero/aero/Views/SettingsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Configuración",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 73
+        }
+      },
+      {
+        "comment": "",
+        "key": "Perfil",
+        "location": {
+          "startingColumn": 21,
+          "startingLine": 22
+        }
+      },
+      {
+        "comment": "",
+        "key": "Estilo de estudio",
+        "location": {
+          "startingColumn": 21,
+          "startingLine": 30
+        }
+      },
+      {
+        "comment": "",
+        "key": "Accesibilidad",
+        "location": {
+          "startingColumn": 21,
+          "startingLine": 42
+        }
+      },
+      {
+        "comment": "",
+        "key": "Apariencia",
+        "location": {
+          "startingColumn": 21,
+          "startingLine": 54
+        }
+      },
+      {
+        "comment": "",
+        "key": "Nombre",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 23
+        }
+      },
+      {
+        "comment": "",
+        "key": "Guardar nombre",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 26
+        }
+      },
+      {
+        "comment": "",
+        "key": "Modo Focus",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 55
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reducir movimiento",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 58
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tamaño de texto",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 65
+        }
+      },
+      {
+        "comment": "",
+        "key": "AUTO",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 59
+        }
+      },
+      {
+        "comment": "",
+        "key": "ON",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 60
+        }
+      },
+      {
+        "comment": "",
+        "key": "OFF",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 61
+        }
+      },
+      {
+        "comment": "",
+        "key": "Normal",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 66
+        }
+      },
+      {
+        "comment": "",
+        "key": "Grande",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 67
+        }
+      },
+      {
+        "comment": "",
+        "key": "Muy grande",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 68
+        }
+      },
+      {
+        "comment": "",
+        "key": "Activado",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 166
+        }
+      },
+      {
+        "comment": "",
+        "key": "Desactivado",
+        "location": {
+          "startingColumn": 55,
+          "startingLine": 166
+        }
+      }
+    ]
+  },
+  "version": 1
+}

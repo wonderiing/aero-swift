@@ -23,6 +23,7 @@ final class PracticeSessionViewModel: ObservableObject {
     @Published var expandedExplanation: String?
     @Published var isExpandingExplanation = false
     @Published var lastEvaluationUsedAppleIntelligence = false
+    @Published var consecutiveCorrectStreak = 0
 
     var modelContext: ModelContext?
 
@@ -34,6 +35,7 @@ final class PracticeSessionViewModel: ObservableObject {
         isLoading = true
         sessionCorrectCount = 0
         sessionAnsweredCount = 0
+        consecutiveCorrectStreak = 0
 
         let now = Date()
         let queue = study.flashcards
@@ -41,10 +43,20 @@ final class PracticeSessionViewModel: ObservableObject {
             .sorted { $0.nextReviewAt < $1.nextReviewAt }
 
         let analysis = GapAnalysis.compute(flashcards: study.flashcards)
-        flashcards = prioritizeQueue(queue, gaps: analysis)
+        let prioritized = prioritizeQueue(queue, gaps: analysis)
+        flashcards = applySessionStyleLimits(to: prioritized)
         currentIndex = 0
         prepareCurrentCard()
         isLoading = false
+    }
+
+    private func applySessionStyleLimits(to cards: [SDFlashcard]) -> [SDFlashcard] {
+        let raw = UserDefaults.standard.string(forKey: "sessionStyle") ?? ""
+        let set = Set(raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+        if set.contains("short_sessions") {
+            return Array(cards.prefix(10))
+        }
+        return cards
     }
 
     private func prioritizeQueue(_ queue: [SDFlashcard], gaps: GapAnalysis) -> [SDFlashcard] {
@@ -147,7 +159,12 @@ final class PracticeSessionViewModel: ObservableObject {
             try ctx.save()
             evaluationResult = attempt
             sessionAnsweredCount += 1
-            if dto.isCorrect { sessionCorrectCount += 1 }
+            if dto.isCorrect {
+                sessionCorrectCount += 1
+                consecutiveCorrectStreak += 1
+            } else {
+                consecutiveCorrectStreak = 0
+            }
             isShowingAnswer = true
         } catch {
             evaluationResult = nil

@@ -1,0 +1,88 @@
+{
+  "source": "/Users/Alumno/Desktop/hackathon/aero/aero/Views/OnboardingFlowView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Comenzar onboarding",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 196
+        }
+      },
+      {
+        "comment": "",
+        "key": "Aprende con lo que ya tienes",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 173
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sube tus notas y PDFs. La IA genera flashcards, detecta en qué fallas y adapta tu estudio.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 178
+        }
+      },
+      {
+        "comment": "",
+        "key": "Comenzar",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 189
+        }
+      },
+      {
+        "comment": "",
+        "key": "Seleccionado",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 334
+        }
+      },
+      {
+        "comment": "",
+        "key": "No seleccionado",
+        "location": {
+          "startingColumn": 59,
+          "startingLine": 334
+        }
+      },
+      {
+        "comment": "",
+        "key": "Doble toque para cambiar la selección.",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 335
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tu nombre",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 357
+        }
+      },
+      {
+        "comment": "",
+        "key": "¿Cómo te llamamos?",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 348
+        }
+      },
+      {
+        "comment": "",
+        "key": "Solo lo usamos para personalizar tu experiencia.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 352
+        }
+      }
+    ]
+  },
+  "version": 1
+}

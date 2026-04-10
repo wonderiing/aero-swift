@@ -5,16 +5,16 @@ import SwiftData
 struct aeroApp: App {
     var body: some Scene {
         WindowGroup {
-            StudyListView()
+            AppRootView()
                 .onAppear {
                     IntelligentStudyAssistant.prewarm()
                 }
         }
-        .modelContainer(for: [SDStudy.self, SDResource.self, SDFlashcard.self, SDAttempt.self])
+        .modelContainer(for: [SDStudy.self, SDResource.self, SDFlashcard.self, SDAttempt.self, UserProfile.self])
     }
 }
 
 #Preview("App — raíz") {
-    StudyListView()
-        .modelContainer(for: [SDStudy.self, SDResource.self, SDFlashcard.self, SDAttempt.self], inMemory: true)
+    AppRootView()
+        .modelContainer(for: [SDStudy.self, SDResource.self, SDFlashcard.self, SDAttempt.self, UserProfile.self], inMemory: true)
 }

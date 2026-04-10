@@ -15,6 +15,7 @@ final class StudyDetailViewModel: ObservableObject {
     @Published var showingAddResource = false
     @Published var showingGenerateFlashcards = false
     @Published var showingCreateFlashcardManual = false
+    @Published var showingGenerateFromGaps = false
     @Published var resourceTitle = ""
     @Published var resourceContent = ""
     @Published var resourceSourceName: String?
@@ -97,6 +98,18 @@ final class StudyDetailViewModel: ObservableObject {
         } catch {
             errorMessage = "Error al crear flashcard: \(error.localizedDescription)"
             return false
+        }
+    }
+
+    func deleteFlashcard(id: UUID) {
+        guard let ctx = modelContext,
+              let card = study.flashcards.first(where: { $0.id == id }) else { return }
+        ctx.delete(card)
+        do {
+            try ctx.save()
+            fetchContent()
+        } catch {
+            errorMessage = "Error al eliminar flashcard: \(error.localizedDescription)"
         }
     }
 

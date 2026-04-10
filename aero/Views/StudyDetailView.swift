@@ -83,6 +83,9 @@ struct StudyDetailView: View {
         .sheet(isPresented: $viewModel.showingCreateFlashcardManual) {
             CreateFlashcardManualView(viewModel: viewModel)
         }
+        .sheet(isPresented: $viewModel.showingGenerateFromGaps) {
+            GenerateFromGapsSheet(viewModel: viewModel)
+        }
         .onAppear {
             viewModel.modelContext = modelContext
             viewModel.fetchContent()
@@ -330,7 +333,9 @@ struct FlashcardsTab: View {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 10) {
                     ForEach(viewModel.flashcards) { card in
-                        FlashcardItemView(card: card, isLargeCanvas: isLargeCanvas)
+                        FlashcardItemView(card: card, isLargeCanvas: isLargeCanvas) {
+                            viewModel.deleteFlashcard(id: card.id)
+                        }
                     }
                 }
                 .padding(.horizontal, isLargeCanvas ? 24 : 16)
@@ -343,6 +348,7 @@ struct FlashcardsTab: View {
 struct FlashcardItemView: View {
     let card: SDFlashcard
     let isLargeCanvas: Bool
+    var onDelete: (() -> Void)? = nil
     @State private var isExpanded = false
 
     var body: some View {
@@ -412,6 +418,13 @@ struct FlashcardItemView: View {
             }
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if let onDelete {
+                Button(role: .destructive, action: onDelete) {
+                    Label("Eliminar tarjeta", systemImage: "trash")
+                }
+            }
+        }
     }
 }
 
@@ -427,85 +440,139 @@ struct ProgressTab: View {
             let totalAtt = allAttempts.count
             let correctAtt = allAttempts.filter(\.isCorrect).count
             let acc = totalAtt > 0 ? min(1, max(0, Double(correctAtt) / Double(totalAtt))) : 0.0
-            ScrollView {
-                VStack(spacing: 14) {
-                    // Accuracy card
-                    AeroSurfaceCard {
-                        HStack(spacing: 20) {
-                            ZStack {
-                                Circle()
-                                    .stroke(Color.gray.opacity(0.15), lineWidth: 10)
-                                    .frame(width: 90, height: 90)
-                                Circle()
-                                    .trim(from: 0, to: CGFloat(acc))
-                                    .stroke(
-                                        LinearGradient(colors: [.indigo, .teal],
-                                                       startPoint: .leading, endPoint: .trailing),
-                                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                                    )
-                                    .frame(width: 90, height: 90)
-                                    .rotationEffect(.degrees(-90))
-                                    .animation(.easeOut(duration: 0.8), value: acc)
-                                Text("\(Int(acc * 100))%")
-                                    .font(.title3)
-                                    .fontWeight(.bold)
-                            }
 
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Precisión general")
-                                    .font(isLargeCanvas ? .title3 : .headline)
-                                StatRow(label: "Total", value: "\(totalAtt)")
-                                StatRow(label: "Aciertos", value: "\(correctAtt)", color: .green)
-                                StatRow(label: "Errores", value: "\(totalAtt - correctAtt)", color: .red)
-                            }
-                            Spacer()
-                        }
-                    }
-
-                    if !gaps.errorTypeBreakdown.isEmpty {
-                        ProgressSectionHeader(title: "Errores por tipo",
-                                              systemImage: "chart.bar.fill",
-                                              color: .indigo)
+            if totalAtt == 0 {
+                ContentUnavailableView(
+                    "Sin datos de práctica",
+                    systemImage: "chart.bar.xaxis",
+                    description: Text("Practica algunas flashcards para ver tu progreso aquí.")
+                )
+            } else {
+                ScrollView {
+                    VStack(spacing: 14) {
+                        // Accuracy card
                         AeroSurfaceCard {
-                            VStack(spacing: 10) {
-                                ForEach(gaps.errorTypeBreakdown, id: \.type.rawValue) { item in
-                                    let pct = totalAtt > 0 ? Double(item.count) / Double(totalAtt) : 0
-                                    HStack {
-                                        Text(item.type.rawValue.capitalized)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                        Spacer()
-                                        Text("\(item.count) · \(Int(pct * 100))%")
-                                            .font(.caption)
-                                            .fontWeight(.semibold)
+                            HStack(spacing: 20) {
+                                ZStack {
+                                    Circle()
+                                        .stroke(Color.gray.opacity(0.15), lineWidth: 10)
+                                        .frame(width: 90, height: 90)
+                                    Circle()
+                                        .trim(from: 0, to: CGFloat(acc))
+                                        .stroke(
+                                            LinearGradient(colors: [.indigo, .teal],
+                                                           startPoint: .leading, endPoint: .trailing),
+                                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                                        )
+                                        .frame(width: 90, height: 90)
+                                        .rotationEffect(.degrees(-90))
+                                        .animation(.easeOut(duration: 0.8), value: acc)
+                                    Text("\(Int(acc * 100))%")
+                                        .font(.title3)
+                                        .fontWeight(.bold)
+                                }
+
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Precisión general")
+                                        .font(isLargeCanvas ? .title3 : .headline)
+                                    StatRow(label: "Total intentos", value: "\(totalAtt)")
+                                    StatRow(label: "Aciertos", value: "\(correctAtt)", color: .green)
+                                    StatRow(label: "Errores", value: "\(totalAtt - correctAtt)", color: .red)
+                                    let reviewed = viewModel.flashcards.filter { !$0.attempts.isEmpty }.count
+                                    StatRow(label: "Tarjetas practicadas", value: "\(reviewed) / \(viewModel.flashcards.count)")
+                                }
+                                Spacer()
+                            }
+                        }
+
+                        if !gaps.errorTypeBreakdown.isEmpty {
+                            ProgressSectionHeader(title: "Errores por tipo",
+                                                  systemImage: "chart.bar.fill",
+                                                  color: .indigo)
+                            AeroSurfaceCard {
+                                VStack(spacing: 10) {
+                                    ForEach(gaps.errorTypeBreakdown, id: \.type.rawValue) { item in
+                                        let pct = totalAtt > 0 ? Double(item.count) / Double(totalAtt) : 0
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            HStack {
+                                                HStack(spacing: 6) {
+                                                    Image(systemName: errorTypeIcon(item.type))
+                                                        .font(.caption)
+                                                        .foregroundStyle(errorTypeColor(item.type))
+                                                    Text(errorTypeLabel(item.type))
+                                                        .font(.caption)
+                                                        .foregroundStyle(.primary)
+                                                }
+                                                Spacer()
+                                                Text("\(item.count) error\(item.count == 1 ? "" : "es") · \(Int(pct * 100))%")
+                                                    .font(.caption)
+                                                    .fontWeight(.semibold)
+                                                    .foregroundStyle(errorTypeColor(item.type))
+                                            }
+                                            ProgressView(value: pct)
+                                                .tint(errorTypeColor(item.type))
+                                        }
                                     }
-                                    ProgressView(value: pct)
-                                        .tint(.indigo)
                                 }
                             }
                         }
-                    }
 
-                    if !gaps.gaps.isEmpty {
-                        ProgressSectionHeader(title: "Conceptos débiles",
-                                              systemImage: "exclamationmark.triangle.fill",
-                                              color: .orange)
-                        ForEach(gaps.gaps) { gap in
-                            GapCardView(gap: gap)
+                        if !gaps.gaps.isEmpty {
+                            ProgressSectionHeader(title: "Lagunas de conocimiento",
+                                                  systemImage: "exclamationmark.triangle.fill",
+                                                  color: .orange)
+                            ForEach(gaps.gaps) { gap in
+                                GapCardView(gap: gap, isLargeCanvas: isLargeCanvas)
+                            }
+
+                            // CTA prominente para generar desde lagunas
+                            Button {
+                                viewModel.showingGenerateFromGaps = true
+                            } label: {
+                                AeroSurfaceCard {
+                                    HStack(spacing: 14) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(LinearGradient(colors: [.orange, .red],
+                                                                     startPoint: .topLeading,
+                                                                     endPoint: .bottomTrailing))
+                                                .frame(width: 46, height: 46)
+                                            Image(systemName: "wand.and.stars")
+                                                .font(.title3)
+                                                .foregroundStyle(.white)
+                                        }
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text("Generar tarjetas de refuerzo")
+                                                .font(isLargeCanvas ? .subheadline : .callout)
+                                                .fontWeight(.semibold)
+                                                .foregroundStyle(.primary)
+                                            Text("La IA creará flashcards dirigidas a tus \(gaps.gaps.count) laguna\(gaps.gaps.count == 1 ? "" : "s") detectada\(gaps.gaps.count == 1 ? "" : "s")")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption)
+                                            .foregroundStyle(.orange)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(viewModel.resources.isEmpty)
+                        }
+
+                        if !gaps.strongConcepts.isEmpty {
+                            ProgressSectionHeader(title: "Conceptos dominados",
+                                                  systemImage: "checkmark.seal.fill",
+                                                  color: .green)
+                            ForEach(gaps.strongConcepts) { concept in
+                                StrongConceptCardView(concept: concept)
+                            }
                         }
                     }
-
-                    if !gaps.strongConcepts.isEmpty {
-                        ProgressSectionHeader(title: "Conceptos fuertes",
-                                              systemImage: "checkmark.seal.fill",
-                                              color: .green)
-                        ForEach(gaps.strongConcepts) { concept in
-                            StrongConceptCardView(concept: concept)
-                        }
-                    }
+                    .padding(.horizontal, isLargeCanvas ? 24 : 16)
+                    .padding(.vertical, 12)
                 }
-                .padding(.horizontal, isLargeCanvas ? 24 : 16)
-                .padding(.vertical, 12)
             }
         } else {
             VStack(spacing: 12) {
@@ -515,6 +582,33 @@ struct ProgressTab: View {
                     .foregroundColor(.secondary)
             }
             .frame(maxHeight: .infinity)
+        }
+    }
+
+    private func errorTypeLabel(_ type: ErrorType) -> String {
+        switch type {
+        case .conceptual: return "Error conceptual"
+        case .memoria: return "Falta de memoria"
+        case .confusion: return "Confusión"
+        case .incompleto: return "Respuesta incompleta"
+        }
+    }
+
+    private func errorTypeIcon(_ type: ErrorType) -> String {
+        switch type {
+        case .conceptual: return "brain"
+        case .memoria: return "clock.arrow.circlepath"
+        case .confusion: return "arrow.triangle.2.circlepath"
+        case .incompleto: return "text.badge.minus"
+        }
+    }
+
+    private func errorTypeColor(_ type: ErrorType) -> Color {
+        switch type {
+        case .conceptual: return .red
+        case .memoria: return .orange
+        case .confusion: return .purple
+        case .incompleto: return .indigo
         }
     }
 }
@@ -549,27 +643,122 @@ struct ProgressSectionHeader: View {
 
 struct GapCardView: View {
     let gap: ConceptGap
+    let isLargeCanvas: Bool
+    @State private var isExpanded = false
+
+    private var severityColor: Color {
+        gap.error_rate >= 0.7 ? .red : gap.error_rate >= 0.5 ? .orange : Color(red: 0.9, green: 0.6, blue: 0)
+    }
+
+    private var severityLabel: String {
+        gap.error_rate >= 0.7 ? "Crítico" : gap.error_rate >= 0.5 ? "Alto" : "Moderado"
+    }
+
+    private func errorTypeLabel(_ type: ErrorType) -> String {
+        switch type {
+        case .conceptual: return "Error conceptual — no comprende el concepto"
+        case .memoria: return "Falta de memoria — no lo recuerda"
+        case .confusion: return "Confusión — mezcla con otro concepto"
+        case .incompleto: return "Respuesta incompleta — le falta detalle"
+        }
+    }
 
     var body: some View {
-        AeroSurfaceCard {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle().fill(Color.orange.opacity(0.12)).frame(width: 44, height: 44)
-                    Text("\(Int(gap.error_rate * 100))%")
-                        .font(.caption).fontWeight(.bold).foregroundStyle(.orange)
-                }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(gap.concept).font(.subheadline).fontWeight(.medium)
-                    Text("\(gap.errors) errores de \(gap.total_attempts) intentos · \(gap.trend)")
-                        .font(.caption2).foregroundStyle(.secondary)
-                    if let det = gap.dominant_error_type {
-                        Text("Error principal: \(det.rawValue)")
-                            .font(.caption2).foregroundStyle(.orange.opacity(0.8))
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) { isExpanded.toggle() }
+        } label: {
+            AeroSurfaceCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            Circle().fill(severityColor.opacity(0.12)).frame(width: 50, height: 50)
+                            Text("\(Int(gap.error_rate * 100))%")
+                                .font(.subheadline).fontWeight(.bold).foregroundStyle(severityColor)
+                        }
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text(gap.concept.capitalized)
+                                    .font(isLargeCanvas ? .subheadline : .callout)
+                                    .fontWeight(.semibold)
+                                Text(severityLabel)
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(severityColor.opacity(0.1))
+                                    .foregroundStyle(severityColor)
+                                    .clipShape(Capsule())
+                            }
+                            Text("\(gap.errors) errores de \(gap.total_attempts) intentos")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.caption).fontWeight(.semibold).foregroundStyle(.secondary)
+                    }
+
+                    if isExpanded {
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            // Barra de error rate
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("Tasa de error")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text("\(Int(gap.error_rate * 100))%")
+                                        .font(.caption2).fontWeight(.semibold).foregroundStyle(severityColor)
+                                }
+                                ProgressView(value: gap.error_rate)
+                                    .tint(severityColor)
+                            }
+
+                            if let det = gap.dominant_error_type {
+                                HStack(alignment: .top, spacing: 8) {
+                                    Image(systemName: "exclamationmark.bubble.fill")
+                                        .font(.caption).foregroundStyle(.orange)
+                                    Text(errorTypeLabel(det))
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+
+                            if let lastSeen = gap.last_seen {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "clock").font(.caption2).foregroundStyle(.secondary)
+                                    Text("Último intento: \(lastSeen.formatted(date: .abbreviated, time: .omitted))")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                }
+                            }
+
+                            // Mini progress bar aciertos vs errores
+                            let successRate = 1.0 - gap.error_rate
+                            HStack(spacing: 6) {
+                                Label("\(gap.total_attempts - gap.errors) correctos", systemImage: "checkmark.circle.fill")
+                                    .font(.caption2).foregroundStyle(.green)
+                                Spacer()
+                                Label("\(gap.errors) errores", systemImage: "xmark.circle.fill")
+                                    .font(.caption2).foregroundStyle(.red)
+                            }
+                            GeometryReader { geo in
+                                HStack(spacing: 2) {
+                                    Rectangle()
+                                        .fill(Color.green.opacity(0.7))
+                                        .frame(width: geo.size.width * CGFloat(successRate), height: 6)
+                                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                                    Rectangle()
+                                        .fill(Color.red.opacity(0.7))
+                                        .frame(width: geo.size.width * CGFloat(gap.error_rate), height: 6)
+                                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                                }
+                            }
+                            .frame(height: 6)
+                        }
                     }
                 }
-                Spacer()
             }
         }
+        .buttonStyle(.plain)
     }
 }
 
@@ -591,6 +780,200 @@ struct StrongConceptCardView: View {
                 Spacer()
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
             }
+        }
+    }
+}
+
+// MARK: - Generate From Gaps Sheet
+
+struct GenerateFromGapsSheet: View {
+    @ObservedObject var viewModel: StudyDetailViewModel
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    @State private var drafts: [EditableFlashcard] = []
+    @State private var navigateReview = false
+    @State private var isGenerating = false
+    @State private var generationError: String?
+    @State private var generationProgress: Double = 0
+    @State private var generationStatus = "Preparando..."
+
+    private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
+
+    private var gaps: [ConceptGap] {
+        viewModel.gapAnalysis?.gaps ?? []
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                AeroAppBackground()
+
+                ScrollView {
+                    VStack(spacing: 16) {
+                        // Info header
+                        AeroSurfaceCard {
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "wand.and.stars")
+                                        .font(.title3)
+                                        .foregroundStyle(LinearGradient(colors: [.orange, .red], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    Text("Refuerzo inteligente")
+                                        .font(.headline)
+                                }
+                                Text("La IA generará flashcards específicas para los conceptos donde tienes más dificultad.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        if gaps.isEmpty {
+                            AeroSurfaceCard {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "checkmark.seal.fill")
+                                        .font(.largeTitle).foregroundStyle(.green)
+                                    Text("¡Sin lagunas detectadas!")
+                                        .font(.headline)
+                                    Text("Practica más tarjetas para que el análisis detecte conceptos a reforzar.")
+                                        .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                            }
+                        } else {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Conceptos a reforzar (\(min(gaps.count, 5)))")
+                                    .font(.headline)
+                                    .padding(.horizontal, 2)
+                                ForEach(gaps.prefix(5)) { gap in
+                                    AeroSurfaceCard {
+                                        HStack(spacing: 12) {
+                                            ZStack {
+                                                Circle()
+                                                    .fill(Color.orange.opacity(0.12))
+                                                    .frame(width: 40, height: 40)
+                                                Text("\(Int(gap.error_rate * 100))%")
+                                                    .font(.caption).fontWeight(.bold).foregroundStyle(.orange)
+                                            }
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(gap.concept.capitalized)
+                                                    .font(.subheadline).fontWeight(.medium)
+                                                if let det = gap.dominant_error_type {
+                                                    Text(det.rawValue.capitalized)
+                                                        .font(.caption2).foregroundStyle(.secondary)
+                                                }
+                                            }
+                                            Spacer()
+                                            Text("\(gap.errors)/\(gap.total_attempts) errores")
+                                                .font(.caption2).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if let generationError {
+                            AeroSurfaceCard {
+                                HStack(alignment: .top, spacing: 10) {
+                                    Image(systemName: "xmark.octagon.fill").foregroundStyle(.red)
+                                    Text(generationError).font(.subheadline).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, isLargeCanvas ? 24 : 16)
+                    .padding(.vertical, 12)
+                }
+                .allowsHitTesting(!isGenerating)
+                .blur(radius: isGenerating ? 3 : 0)
+
+                if isGenerating {
+                    Color.black.opacity(0.12).ignoresSafeArea().transition(.opacity)
+                    VStack(spacing: 20) {
+                        ProgressView(value: generationProgress) {
+                            Text(generationStatus)
+                                .font(.subheadline).fontWeight(.medium)
+                        }
+                        .progressViewStyle(.circular)
+                        .scaleEffect(1.5)
+                        .padding(.bottom, 8)
+                        Text(generationStatus)
+                            .font(.subheadline).foregroundStyle(.secondary)
+                        Text("\(Int(generationProgress * 100))%")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(32)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(.ultraThinMaterial)
+                            .shadow(color: .black.opacity(0.1), radius: 16, y: 8)
+                    )
+                    .transition(.scale(scale: 0.9).combined(with: .opacity))
+                }
+            }
+            .navigationTitle("Generar desde lagunas")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cerrar") { dismiss() }.disabled(isGenerating)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        Task { await runGeneration() }
+                    } label: {
+                        Label("Generar", systemImage: "sparkles")
+                    }
+                    .disabled(gaps.isEmpty || viewModel.resources.isEmpty || isGenerating)
+                }
+            }
+            .navigationDestination(isPresented: $navigateReview) {
+                ReviewGeneratedFlashcardsView(
+                    viewModel: viewModel,
+                    drafts: $drafts,
+                    onFinish: {
+                        navigateReview = false
+                        dismiss()
+                    }
+                )
+            }
+        }
+    }
+
+    private func runGeneration() async {
+        isGenerating = true
+        generationError = nil
+        generationProgress = 0.05
+        generationStatus = "Analizando lagunas..."
+
+        let payload = viewModel.resources.map { (id: $0.id, title: $0.title, content: $0.content) }
+
+        do {
+            let result = try await IntelligentStudyAssistant.generateFlashcardsFromGaps(
+                gaps: gaps,
+                resources: payload,
+                onProgress: { progress in
+                    Task { @MainActor in
+                        let total = max(1, progress.totalChunks)
+                        generationProgress = 0.05 + 0.85 * (Double(progress.completedChunks) / Double(total))
+                        generationStatus = progress.completedChunks < total
+                            ? "Generando parte \(progress.completedChunks + 1) de \(total)..."
+                            : "Finalizando..."
+                    }
+                }
+            )
+            generationProgress = 1.0
+            generationStatus = "¡Listo!"
+            try? await Task.sleep(for: .milliseconds(400))
+            drafts = result
+            isGenerating = false
+            if result.isEmpty {
+                generationError = "No se generaron tarjetas. Asegúrate de tener recursos con contenido relevante."
+            } else {
+                navigateReview = true
+            }
+        } catch {
+            generationError = error.localizedDescription
+            isGenerating = false
         }
     }
 }

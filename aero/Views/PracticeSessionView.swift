@@ -4,9 +4,14 @@ import SwiftData
 struct PracticeSessionView: View {
     @StateObject private var viewModel: PracticeSessionViewModel
     @StateObject private var speech = SpeechInputController()
+    @StateObject private var tts = TextToSpeechManager()
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    @AppStorage("sessionStyle") private var sessionStyle: String = ""
+    @AppStorage("accessibilityNeeds") private var accessibilityNeeds: String = ""
+    @AppStorage("focusMode") private var focusMode: Bool = false
 
     init(study: SDStudy) {
         _viewModel = StateObject(wrappedValue: PracticeSessionViewModel(study: study))
@@ -15,6 +20,17 @@ struct PracticeSessionView: View {
     private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
     private var contentWidth: CGFloat {
         isLargeCanvas ? AeroAdaptiveLayout.maxRegularContentWidth : AeroAdaptiveLayout.maxCompactContentWidth
+    }
+
+    private var sessionStyleSet: Set<String> {
+        Set(sessionStyle.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+    }
+    private var needsSet: Set<String> {
+        Set(accessibilityNeeds.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+    }
+
+    private var prefersAudio: Bool {
+        sessionStyleSet.contains("prefer_audio") || needsSet.contains("dyslexia")
     }
 
     var body: some View {
@@ -33,7 +49,12 @@ struct PracticeSessionView: View {
                 NoCardsView(action: { dismiss() })
             } else {
                 VStack(spacing: 16) {
-                    ProgressHeader(current: viewModel.currentIndex + 1, total: viewModel.flashcards.count, isLargeCanvas: isLargeCanvas)
+                    ProgressHeader(
+                        current: viewModel.currentIndex + 1,
+                        total: viewModel.flashcards.count,
+                        isLargeCanvas: isLargeCanvas,
+                        streak: (focusMode || needsSet.contains("adhd")) ? viewModel.consecutiveCorrectStreak : nil
+                    )
 
                     FlashcardView(
                         card: viewModel.flashcards[viewModel.currentIndex],
@@ -49,7 +70,10 @@ struct PracticeSessionView: View {
                             Task { await viewModel.explainMore() }
                         },
                         speech: speech,
-                        isLargeCanvas: isLargeCanvas
+                        isLargeCanvas: isLargeCanvas,
+                        prefersAudio: prefersAudio,
+                        needs: needsSet,
+                        tts: tts
                     )
 
                     BottomControls(viewModel: viewModel, isLargeCanvas: isLargeCanvas)
@@ -74,6 +98,7 @@ struct PracticeSessionView: View {
         }
         .onDisappear {
             speech.stop()
+            tts.stop()
         }
     }
 }
@@ -82,6 +107,7 @@ struct ProgressHeader: View {
     let current: Int
     let total: Int
     let isLargeCanvas: Bool
+    let streak: Int?
 
     var body: some View {
         VStack(spacing: 12) {
@@ -90,6 +116,13 @@ struct ProgressHeader: View {
                     .font(isLargeCanvas ? .title3 : .headline)
                     .fontWeight(.semibold)
                 Spacer()
+                if let streak, streak >= 2 {
+                    Text("🔥 \(streak)")
+                        .font(isLargeCanvas ? .title3 : .headline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.orange)
+                        .accessibilityLabel("Racha \(streak)")
+                }
                 Text("\(Int(Double(current - 1) / Double(max(total, 1)) * 100))%")
                     .font(isLargeCanvas ? .title3 : .headline)
                     .fontWeight(.bold)
@@ -116,25 +149,48 @@ struct FlashcardView: View {
     let onExplainMore: () -> Void
     @ObservedObject var speech: SpeechInputController
     let isLargeCanvas: Bool
+    let prefersAudio: Bool
+    let needs: Set<String>
+    @ObservedObject var tts: TextToSpeechManager
+
+    private var isDyslexia: Bool { needs.contains("dyslexia") }
+    private var lineSpacing: CGFloat { isDyslexia ? 7 : 4 }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
                 // Question section
                 VStack(alignment: .leading, spacing: 18) {
-                    Label(card.type == .open ? "Pregunta abierta" : "Opción múltiple",
-                          systemImage: card.type == .open ? "text.bubble" : "list.bullet.circle")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(card.type == .open ? Color.indigo : Color.purple)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background((card.type == .open ? Color.indigo : Color.purple).opacity(0.1))
-                        .clipShape(.rect(cornerRadius: 10))
+                    HStack(spacing: 10) {
+                        Label(card.type == .open ? "Pregunta abierta" : "Opción múltiple",
+                              systemImage: card.type == .open ? "text.bubble" : "list.bullet.circle")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(card.type == .open ? Color.indigo : Color.purple)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background((card.type == .open ? Color.indigo : Color.purple).opacity(0.1))
+                            .clipShape(.rect(cornerRadius: 10))
+
+                        Spacer()
+
+                        if prefersAudio {
+                            Button {
+                                tts.speak(card.question)
+                            } label: {
+                                Label("Audio", systemImage: "speaker.wave.2.fill")
+                                    .labelStyle(.iconOnly)
+                                    .font(.title3)
+                            }
+                            .buttonStyle(.bordered)
+                            .accessibilityLabel("Reproducir audio de la pregunta")
+                        }
+                    }
 
                     Text(card.question)
                         .font(isLargeCanvas ? .largeTitle : .title2)
                         .fontWeight(.semibold)
+                        .lineSpacing(lineSpacing)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
@@ -176,7 +232,7 @@ struct FlashcardView: View {
                         .textCase(.uppercase)
                     Text(card.answer)
                         .font(.title3)
-                        .lineSpacing(4)
+                        .lineSpacing(lineSpacing)
                         .foregroundStyle(.primary)
                 }
             }
@@ -206,7 +262,7 @@ struct FlashcardView: View {
                             .foregroundStyle(.secondary)
                         Text(card.answer)
                             .font(.title3)
-                            .lineSpacing(4)
+                            .lineSpacing(lineSpacing)
                             .foregroundStyle(.primary)
                     }
                     .padding(16)
@@ -226,7 +282,7 @@ struct FlashcardView: View {
                 if let fb = ev.feedback, !fb.isEmpty {
                     Text(fb)
                         .font(.body)
-                        .lineSpacing(4)
+                        .lineSpacing(lineSpacing)
                         .foregroundStyle(.secondary)
                 }
 
@@ -251,7 +307,7 @@ struct FlashcardView: View {
                 if let more = expandedExplanation, !more.isEmpty {
                     Text(more)
                         .font(.body)
-                        .lineSpacing(4)
+                        .lineSpacing(lineSpacing)
                         .foregroundStyle(.primary)
                 }
             }
@@ -260,6 +316,11 @@ struct FlashcardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.green.opacity(0.03))
         .transition(.move(edge: .bottom).combined(with: .opacity))
+        .onAppear {
+            if prefersAudio {
+                tts.speak(card.answer)
+            }
+        }
     }
 
     @ViewBuilder
@@ -287,7 +348,11 @@ struct FlashcardView: View {
                             if speech.isRecording {
                                 speech.stop()
                             } else {
-                                speech.start { text in userAnswer = text }
+                                speech.start { text in
+                                    Task { @MainActor in
+                                        userAnswer = text
+                                    }
+                                }
                             }
                         }
                     } label: {
@@ -447,7 +512,7 @@ struct NoCardsView: View {
 }
 
 #Preview("Cabecera progreso") {
-    ProgressHeader(current: 2, total: 5, isLargeCanvas: false)
+    ProgressHeader(current: 2, total: 5, isLargeCanvas: false, streak: 3)
         .padding()
 }
 #endif
