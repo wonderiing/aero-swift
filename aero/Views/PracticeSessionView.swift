@@ -1,12 +1,14 @@
 import SwiftUI
+import SwiftData
 
 struct PracticeSessionView: View {
     @StateObject private var viewModel: PracticeSessionViewModel
     @StateObject private var speech = SpeechInputController()
     @Environment(\.dismiss) var dismiss
+    @Environment(\.modelContext) private var modelContext
 
-    init(studyId: UUID) {
-        _viewModel = StateObject(wrappedValue: PracticeSessionViewModel(studyId: studyId))
+    init(study: SDStudy) {
+        _viewModel = StateObject(wrappedValue: PracticeSessionViewModel(study: study))
     }
 
     var body: some View {
@@ -59,8 +61,9 @@ struct PracticeSessionView: View {
                 Button("Salir") { dismiss() }
             }
         }
-        .task {
-            await viewModel.startSession()
+        .onAppear {
+            viewModel.modelContext = modelContext
+            viewModel.startSession()
         }
         .onDisappear {
             speech.stop()
@@ -91,12 +94,12 @@ struct ProgressHeader: View {
 }
 
 struct FlashcardView: View {
-    let card: Flashcard
+    let card: SDFlashcard
     let isShowingAnswer: Bool
     @Binding var userAnswer: String
     let shuffledOptions: [String]
     @Binding var selectedMCOption: String?
-    let evaluation: Attempt?
+    let evaluation: SDAttempt?
     let usedAppleIntelligence: Bool
     let expandedExplanation: String?
     let isExpandingExplanation: Bool
@@ -376,52 +379,7 @@ struct NoCardsView: View {
     }
 }
 
-#Preview("Sesión (red)") {
-    NavigationStack {
-        PracticeSessionView(studyId: UUID())
-    }
-}
-
 #if DEBUG
-#Preview("Tarjeta — con feedback") {
-    FlashcardView(
-        card: Flashcard(
-            id: UUID(),
-            question: "¿Dónde ocurre la fotosíntesis?",
-            answer: "En los cloroplastos.",
-            type: .open,
-            options: nil,
-            conceptTags: ["cloroplasto"],
-            nextReviewAt: nil,
-            easeFactor: 2.5,
-            intervalDays: 1,
-            createdAt: Date()
-        ),
-        isShowingAnswer: true,
-        userAnswer: .constant("En la mitocondria"),
-        shuffledOptions: [],
-        selectedMCOption: .constant(nil),
-        evaluation: Attempt(
-            id: UUID(),
-            userAnswer: "En la mitocondria",
-            isCorrect: false,
-            errorType: .conceptual,
-            missingConcepts: ["cloroplasto"],
-            incorrectConcepts: ["mitocondria"],
-            feedback: "La fotosíntesis ocurre en cloroplastos, no en mitocondrias.",
-            confidenceScore: 0.85,
-            answeredAt: Date(),
-            flashcard: nil
-        ),
-        usedAppleIntelligence: true,
-        expandedExplanation: "Los cloroplastos contienen clorofila y son el sitio de la fotosíntesis.",
-        isExpandingExplanation: false,
-        onExplainMore: {},
-        speech: SpeechInputController()
-    )
-    .padding()
-}
-
 #Preview("Progreso sesión") {
     SessionCompleteView(correct: 4, total: 6, action: {})
 }

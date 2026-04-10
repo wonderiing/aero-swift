@@ -1,6 +1,6 @@
 import Foundation
 
-struct ConceptGap: Codable, Sendable, Identifiable {
+struct ConceptGap: Sendable, Identifiable {
     var id: String { concept }
     let concept: String
     let error_rate: Double
@@ -11,16 +11,9 @@ struct ConceptGap: Codable, Sendable, Identifiable {
     let last_seen: Date?
 }
 
-struct StrongConcept: Codable, Sendable, Identifiable {
+struct StrongConcept: Sendable, Identifiable {
     var id: String { concept }
     let concept: String
     let error_rate: Double
     let total_attempts: Int
-}
-
-struct GapsResponse: Codable, Sendable {
-    let study_id: UUID
-    let total_attempts: Int
-    let gaps: [ConceptGap]
-    let strong_concepts: [StrongConcept]
 }

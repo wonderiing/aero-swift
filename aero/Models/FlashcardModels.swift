@@ -31,19 +31,6 @@ struct FlashcardOptions: Codable, Sendable {
     let distractors: [String]
 }
 
-struct Flashcard: Codable, Identifiable, Sendable {
-    let id: UUID
-    let question: String
-    let answer: String
-    let type: FlashcardType
-    let options: FlashcardOptions?
-    let conceptTags: [String]
-    let nextReviewAt: Date?
-    let easeFactor: Double?
-    let intervalDays: Int?
-    let createdAt: Date?
-}
-
 struct CreateFlashcardDto: Codable, Sendable {
     var question: String
     var answer: String

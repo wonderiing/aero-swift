@@ -1,49 +1,57 @@
 import SwiftUI
+import SwiftData
 
 struct StudyListView: View {
     @StateObject private var viewModel = StudyListViewModel()
-    @EnvironmentObject var appState: AppState
+    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(uiColor: .systemGroupedBackground)
-                    .ignoresSafeArea()
+                Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
 
                 if viewModel.isLoading && viewModel.rows.isEmpty {
-                    ProgressView("Cargando estudios...")
-                } else if viewModel.rows.isEmpty {
-                    EmptyStudiesView {
-                        viewModel.showingCreateStudy = true
+                    VStack(spacing: 16) {
+                        ProgressView().scaleEffect(1.2)
+                        Text("Cargando estudios...")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
                     }
+                } else if viewModel.rows.isEmpty {
+                    EmptyStudiesView { viewModel.showingCreateStudy = true }
                 } else {
                     ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(viewModel.rows) { row in
-                                NavigationLink(destination: StudyDetailView(study: row.study)) {
-                                    StudyCardView(row: row)
-                                }
-                                .buttonStyle(.plain)
-                                .contextMenu {
-                                    Button(role: .destructive) {
-                                        Task { await viewModel.deleteStudy(id: row.study.id) }
-                                    } label: {
-                                        Label("Eliminar estudio", systemImage: "trash")
+                        VStack(spacing: 0) {
+                            StudyStatsBanner(count: viewModel.rows.count)
+                                .padding(.horizontal, 16)
+                                .padding(.top, 8)
+                                .padding(.bottom, 16)
+
+                            LazyVStack(spacing: 12) {
+                                ForEach(viewModel.rows) { row in
+                                    NavigationLink(destination: StudyDetailView(study: row.study)) {
+                                        StudyCardView(row: row)
                                     }
-                                }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button(role: .destructive) {
-                                        Task { await viewModel.deleteStudy(id: row.study.id) }
-                                    } label: {
-                                        Label("Eliminar", systemImage: "trash")
+                                    .buttonStyle(.plain)
+                                    .contextMenu {
+                                        Button(role: .destructive) {
+                                            viewModel.deleteStudy(id: row.study.id)
+                                        } label: {
+                                            Label("Eliminar estudio", systemImage: "trash")
+                                        }
+                                    }
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                        Button(role: .destructive) {
+                                            viewModel.deleteStudy(id: row.study.id)
+                                        } label: {
+                                            Label("Eliminar", systemImage: "trash")
+                                        }
                                     }
                                 }
                             }
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 30)
                         }
-                        .padding()
-                    }
-                    .refreshable {
-                        await viewModel.fetchStudies()
                     }
                 }
             }
@@ -55,164 +63,210 @@ struct StudyListView: View {
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title3)
-                            .foregroundColor(.blue)
-                    }
-                }
-
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        Task {
-                            try? await AuthService.shared.logout()
-                            await MainActor.run {
-                                appState.isAuthenticated = false
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "person.circle")
-                            .foregroundColor(.gray)
+                            .foregroundStyle(.indigo)
                     }
                 }
             }
             .sheet(isPresented: $viewModel.showingCreateStudy) {
                 CreateStudyView(viewModel: viewModel)
             }
-            .onChange(of: viewModel.showingCreateStudy) { isPresented in
-                if !isPresented {
-                    Task { await viewModel.fetchStudies() }
-                }
+            .onChange(of: viewModel.showingCreateStudy) { _, isPresented in
+                if !isPresented { viewModel.fetchStudies() }
             }
-            .task {
-                await viewModel.fetchStudies()
+            .onAppear {
+                viewModel.modelContext = modelContext
+                viewModel.fetchStudies()
             }
         }
     }
 }
 
-#Preview("Lista estudios") {
-    StudyListView()
-        .environmentObject(AppState())
+// MARK: - Stats Banner
+
+struct StudyStatsBanner: View {
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("¡A estudiar!")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                Text("\(count) tema\(count == 1 ? "" : "s") activo\(count == 1 ? "" : "s")")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(
+                        colors: [Color.indigo.opacity(0.18), Color.purple.opacity(0.12)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .frame(width: 54, height: 54)
+                Text("\(count)")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.indigo)
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(uiColor: .systemBackground))
+                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 3)
+        )
+    }
 }
 
-#if DEBUG
-#Preview("Tarjeta estudio") {
-    StudyCardView(row: StudyRowModel(
-        study: Study(
-            id: UUID(),
-            title: "Biología celular",
-            description: "Apuntes del parcial con texto de ejemplo para el preview.",
-            createdAt: Date()
-        ),
-        pendingReviewCount: 7,
-        accuracy: 0.68,
-        lastPractice: Date()
-    ))
-    .padding()
-}
-#endif
+// MARK: - Study Card
 
 struct StudyCardView: View {
     let row: StudyRowModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(row.study.title)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
+        HStack(spacing: 0) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(LinearGradient(
+                    colors: [Color.indigo, Color.purple],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ))
+                .frame(width: 4)
+                .padding(.vertical, 14)
 
-            Text(row.study.description)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-
-            if let acc = row.accuracy {
-                ProgressView(value: acc) {
-                    HStack {
-                        Text("Precisión")
-                            .font(.caption2)
-                        Spacer()
-                        Text("\(Int(acc * 100))%")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                    }
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(row.study.title)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
-                .tint(.blue)
-            }
 
-            HStack {
-                if row.pendingReviewCount > 0 {
-                    Label("\(row.pendingReviewCount) pendientes", systemImage: "rectangle.stack")
+                Text(row.study.desc)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+
+                if let acc = row.accuracy {
+                    let tint: Color = acc >= 0.7 ? .green : acc >= 0.4 ? .orange : .red
+                    ProgressView(value: acc) {
+                        HStack {
+                            Text("Precisión")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text("\(Int(acc * 100))%")
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                                .foregroundColor(tint)
+                        }
+                    }
+                    .tint(tint)
+                }
+
+                HStack(spacing: 8) {
+                    if row.pendingReviewCount > 0 {
+                        Label(
+                            "\(row.pendingReviewCount) pendiente\(row.pendingReviewCount == 1 ? "" : "s")",
+                            systemImage: "rectangle.stack.fill"
+                        )
                         .font(.caption2)
+                        .fontWeight(.medium)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color.orange.opacity(0.15))
+                        .background(Color.orange.opacity(0.12))
                         .foregroundColor(.orange)
                         .cornerRadius(8)
-                } else {
-                    Label("Al día", systemImage: "checkmark.circle")
-                        .font(.caption2)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.green.opacity(0.12))
-                        .foregroundColor(.green)
-                        .cornerRadius(8)
-                }
+                    } else {
+                        Label("Al día", systemImage: "checkmark.circle.fill")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.green.opacity(0.1))
+                            .foregroundColor(.green)
+                            .cornerRadius(8)
+                    }
 
-                Spacer()
+                    Spacer()
 
-                if let last = row.lastPractice {
-                    Text("Última sesión: \(last.formatted(date: .abbreviated, time: .omitted))")
-                        .font(.caption2)
-                        .foregroundColor(.gray)
-                } else {
-                    Text(row.study.createdAt?.formatted(.dateTime.day().month().year()) ?? "Reciente")
-                        .font(.caption2)
-                        .foregroundColor(.gray)
+                    if let last = row.lastPractice {
+                        Text(last.formatted(date: .abbreviated, time: .omitted))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text(row.study.createdAt.formatted(.dateTime.day().month().year()))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
         }
-        .padding()
-        .background(Color.white)
+        .background(Color(uiColor: .systemBackground))
         .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 3)
     }
 }
+
+// MARK: - Empty State
 
 struct EmptyStudiesView: View {
     let action: () -> Void
 
     var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "book.closed")
-                .font(.system(size: 80))
-                .foregroundColor(.gray.opacity(0.3))
+        VStack(spacing: 24) {
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(
+                        colors: [Color.indigo.opacity(0.1), Color.purple.opacity(0.07)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .frame(width: 120, height: 120)
+                Image(systemName: "books.vertical")
+                    .font(.system(size: 48))
+                    .foregroundStyle(
+                        LinearGradient(colors: [.indigo, .purple],
+                                       startPoint: .top, endPoint: .bottom)
+                    )
+            }
 
-            Text("No tienes estudios todavía")
-                .font(.title3)
-                .fontWeight(.medium)
-
-            Text("Crea tu primer tema de estudio para empezar a generar flashcards con IA.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+            VStack(spacing: 8) {
+                Text("Empieza tu primer estudio")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                Text("Crea un tema, agrega recursos y deja que\nla IA genere tus flashcards.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
 
             Button(action: action) {
-                Text("Crear primer estudio")
-                    .fontWeight(.bold)
-                    .padding()
-                    .background(Color.blue)
+                Label("Crear primer estudio", systemImage: "plus")
+                    .fontWeight(.semibold)
                     .foregroundColor(.white)
-                    .cornerRadius(12)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 14)
+                    .background(
+                        LinearGradient(colors: [.indigo, .purple],
+                                       startPoint: .leading, endPoint: .trailing)
+                    )
+                    .cornerRadius(14)
+                    .shadow(color: .indigo.opacity(0.35), radius: 8, x: 0, y: 4)
             }
         }
+        .padding(.horizontal, 40)
     }
 }
+
+// MARK: - Create Study Sheet
 
 struct CreateStudyView: View {
     @ObservedObject var viewModel: StudyListViewModel
@@ -220,36 +274,59 @@ struct CreateStudyView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section(header: Text("Información del Estudio")) {
-                    TextField("Título (ej: Biología Celular)", text: $viewModel.newStudyTitle)
-                    ZStack(alignment: .topLeading) {
-                        if viewModel.newStudyDescription.isEmpty {
-                            Text("Descripción del tema...")
-                                .foregroundColor(.gray.opacity(0.5))
-                                .padding(.top, 8)
-                                .padding(.leading, 4)
+            VStack(spacing: 0) {
+                ZStack {
+                    LinearGradient(
+                        colors: [Color(red: 0.28, green: 0.22, blue: 0.92),
+                                 Color(red: 0.52, green: 0.28, blue: 0.96)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    VStack(spacing: 8) {
+                        Image(systemName: "books.vertical.fill")
+                            .font(.system(size: 34))
+                            .foregroundColor(.white)
+                        Text("Nuevo Estudio")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                        Text("Dale un nombre y descripción a tu tema.")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    .padding(.vertical, 28)
+                }
+                .frame(maxWidth: .infinity)
+
+                Form {
+                    Section {
+                        TextField("Título (ej: Biología Celular)", text: $viewModel.newStudyTitle)
+                        ZStack(alignment: .topLeading) {
+                            if viewModel.newStudyDescription.isEmpty {
+                                Text("Describe el tema de estudio...")
+                                    .foregroundColor(.gray.opacity(0.5))
+                                    .padding(.top, 8)
+                                    .padding(.leading, 4)
+                            }
+                            TextEditor(text: $viewModel.newStudyDescription)
+                                .frame(minHeight: 100)
                         }
-                        TextEditor(text: $viewModel.newStudyDescription)
-                            .frame(minHeight: 100)
+                    } header: {
+                        Text("Información del estudio")
                     }
                 }
             }
-            .navigationTitle("Nuevo Estudio")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancelar") { dismiss() }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Crear") {
-                        Task {
-                            if await viewModel.createStudy() {
-                                dismiss()
-                            }
-                        }
+                    Button {
+                        if viewModel.createStudy() { dismiss() }
+                    } label: {
+                        Text("Crear").fontWeight(.bold)
                     }
-                    .fontWeight(.bold)
                     .disabled(viewModel.newStudyTitle.isEmpty || viewModel.newStudyDescription.isEmpty)
                 }
             }
@@ -257,13 +334,17 @@ struct CreateStudyView: View {
     }
 }
 
-#if DEBUG
-#Preview("Crear estudio") {
-    CreateStudyView(viewModel: StudyListViewModel())
+// MARK: - Previews
+
+#Preview("Lista estudios") {
+    StudyListView()
+        .modelContainer(for: [SDStudy.self, SDResource.self, SDFlashcard.self, SDAttempt.self], inMemory: true)
+}
+
+#Preview("Banner stats") {
+    StudyStatsBanner(count: 5).padding()
 }
 
 #Preview("Estudios vacíos") {
-    EmptyStudiesView(action: {})
-        .padding()
+    EmptyStudiesView(action: {}).padding()
 }
-#endif

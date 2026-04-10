@@ -1,21 +1,20 @@
-//
-//  aeroApp.swift
-//  aero
-//
-//  Created by Alumno on 09/04/26.
-//
-
 import SwiftUI
+import SwiftData
 
 @main
 struct aeroApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            StudyListView()
+                .onAppear {
+                    IntelligentStudyAssistant.prewarm()
+                }
         }
+        .modelContainer(for: [SDStudy.self, SDResource.self, SDFlashcard.self, SDAttempt.self])
     }
 }
 
 #Preview("App — raíz") {
-    ContentView()
+    StudyListView()
+        .modelContainer(for: [SDStudy.self, SDResource.self, SDFlashcard.self, SDAttempt.self], inMemory: true)
 }

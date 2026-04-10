@@ -1,70 +1,28 @@
 import SwiftUI
+import SwiftData
 import UniformTypeIdentifiers
+
+// MARK: - Main View
 
 struct StudyDetailView: View {
     @StateObject private var viewModel: StudyDetailViewModel
+    @Environment(\.modelContext) private var modelContext
     @State private var selectedTab = 0
-    
-    init(study: Study) {
+
+    init(study: SDStudy) {
         _viewModel = StateObject(wrappedValue: StudyDetailViewModel(study: study))
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
-            // Header con información del estudio
-            VStack(alignment: .leading, spacing: 8) {
-                Text(viewModel.study.title)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                Text(viewModel.study.description)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-                
-                // Botón Iniciar Sesión de Repaso
-                NavigationLink(destination: PracticeSessionView(studyId: viewModel.study.id)) {
-                    HStack {
-                        Image(systemName: "play.fill")
-                        Text("Iniciar sesión de repaso")
-                        Spacer()
-                        if !viewModel.reviewQueue.isEmpty {
-                            Text("\(viewModel.reviewQueue.count)")
-                                .font(.caption2)
-                                .fontWeight(.bold)
-                                .padding(6)
-                                .background(Color.white.opacity(0.3))
-                                .clipShape(Circle())
-                        }
-                    }
-                    .padding()
-                    .background(viewModel.reviewQueue.isEmpty ? Color.gray : Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-                }
-                .disabled(viewModel.reviewQueue.isEmpty)
-                .padding(.top, 8)
-            }
-            .padding()
-            .background(Color(uiColor: .systemBackground))
-            
-            // Picker de Tabs
-            Picker("", selection: $selectedTab) {
-                Text("Recursos").tag(0)
-                Text("Flashcards").tag(1)
-                Text("Progreso").tag(2)
-            }
-            .pickerStyle(SegmentedPickerStyle())
-            .padding()
-            .background(Color(uiColor: .systemBackground))
-            
-            // Contenido del Tab
+            StudyHeroHeader(study: viewModel.study, reviewCount: viewModel.reviewQueue.count)
+            StudyTabPicker(selectedTab: $selectedTab)
+
             ZStack {
-                Color(uiColor: .systemGroupedBackground)
-                    .ignoresSafeArea()
-                
+                Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
+
                 if viewModel.isLoading && viewModel.resources.isEmpty && viewModel.flashcards.isEmpty {
-                    ProgressView()
+                    ProgressView().frame(maxHeight: .infinity)
                 } else {
                     TabView(selection: $selectedTab) {
                         ResourcesTab(viewModel: viewModel).tag(0)
@@ -86,12 +44,25 @@ struct StudyDetailView: View {
                         Image(systemName: "plus.circle")
                     }
                 } else if selectedTab == 1 {
-                    Button {
-                        viewModel.showingGenerateFlashcards = true
+                    Menu {
+                        Button {
+                            viewModel.showingGenerateFlashcards = true
+                        } label: {
+                            Label("Generar con IA", systemImage: "wand.and.stars")
+                        }
+                        .disabled(viewModel.resources.isEmpty)
+
+                        Button {
+                            viewModel.showingCreateFlashcardManual = true
+                        } label: {
+                            Label("Crear manualmente", systemImage: "pencil.and.list.clipboard")
+                        }
+                        .disabled(viewModel.resources.isEmpty)
                     } label: {
-                        Image(systemName: "wand.and.stars")
+                        Image(systemName: "plus.circle")
                     }
-                    .disabled(viewModel.resources.isEmpty)
+                } else {
+                    EmptyView()
                 }
             }
         }
@@ -101,218 +72,528 @@ struct StudyDetailView: View {
         .sheet(isPresented: $viewModel.showingGenerateFlashcards) {
             GenerateFlashcardsSheet(viewModel: viewModel)
         }
-        .task {
-            await viewModel.fetchContent()
+        .sheet(isPresented: $viewModel.showingCreateFlashcardManual) {
+            CreateFlashcardManualView(viewModel: viewModel)
+        }
+        .onAppear {
+            viewModel.modelContext = modelContext
+            viewModel.fetchContent()
         }
     }
 }
 
-// MARK: - Tabs
+// MARK: - Hero Header
+
+struct StudyHeroHeader: View {
+    let study: SDStudy
+    let reviewCount: Int
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            LinearGradient(
+                colors: [Color(red: 0.28, green: 0.22, blue: 0.92), Color(red: 0.52, green: 0.28, blue: 0.96)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea(edges: .top)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(study.title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+
+                Text(study.desc)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineLimit(2)
+
+                if reviewCount > 0 {
+                    NavigationLink(destination: PracticeSessionView(study: study)) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "play.fill").font(.caption)
+                            Text("Practicar · \(reviewCount) tarjeta\(reviewCount == 1 ? "" : "s")")
+                                .fontWeight(.semibold)
+                                .font(.subheadline)
+                        }
+                        .foregroundColor(Color(red: 0.28, green: 0.22, blue: 0.92))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 9)
+                        .background(Color.white)
+                        .cornerRadius(20)
+                    }
+                    .padding(.top, 4)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
+            .padding(.top, 16)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: reviewCount > 0 ? 178 : 128)
+    }
+}
+
+// MARK: - Custom Tab Picker
+
+struct StudyTabPicker: View {
+    @Binding var selectedTab: Int
+
+    private let tabs: [(String, String)] = [
+        ("Recursos", "doc.text"),
+        ("Flashcards", "rectangle.stack"),
+        ("Progreso", "chart.bar")
+    ]
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(tabs.indices, id: \.self) { idx in
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
+                        selectedTab = idx
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: tabs[idx].1).font(.caption)
+                        Text(tabs[idx].0)
+                            .font(.subheadline)
+                            .fontWeight(selectedTab == idx ? .semibold : .regular)
+                    }
+                    .foregroundColor(selectedTab == idx ? .white : .secondary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .background(
+                        Capsule().fill(selectedTab == idx ? Color.indigo : Color.clear)
+                    )
+                }
+            }
+        }
+        .padding(5)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+        )
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color(uiColor: .systemGroupedBackground))
+    }
+}
+
+// MARK: - Resources Tab
 
 struct ResourcesTab: View {
     @ObservedObject var viewModel: StudyDetailViewModel
-    
+
     var body: some View {
         if viewModel.resources.isEmpty {
-            VStack(spacing: 20) {
-                Image(systemName: "doc.badge.plus")
-                    .font(.system(size: 60))
-                    .foregroundColor(.gray.opacity(0.3))
-                Text("No hay recursos todavía")
-                    .foregroundColor(.secondary)
-                Button("Agregar primer recurso") {
+            VStack(spacing: 22) {
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(colors: [.indigo.opacity(0.12), .purple.opacity(0.08)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .frame(width: 100, height: 100)
+                    Image(systemName: "doc.badge.plus")
+                        .font(.system(size: 42))
+                        .foregroundStyle(LinearGradient(colors: [.indigo, .purple],
+                                                        startPoint: .top, endPoint: .bottom))
+                }
+                VStack(spacing: 8) {
+                    Text("Sin recursos todavía")
+                        .font(.headline)
+                    Text("Agrega apuntes o PDFs para que la IA\ngenere flashcards automáticamente.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                Button {
                     viewModel.showingAddResource = true
-                }
-                .buttonStyle(.bordered)
-            }
-        } else {
-            List(viewModel.resources) { resource in
-                NavigationLink {
-                    ResourceDetailView(studyViewModel: viewModel, resource: resource)
                 } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(resource.title)
-                            .font(.headline)
-                        Text(resource.content)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
-                        if let src = resource.sourceName {
-                            Text(src)
-                                .font(.caption2)
-                                .foregroundColor(.blue)
-                        }
-                    }
-                    .padding(.vertical, 4)
+                    Label("Agregar recurso", systemImage: "plus")
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 13)
+                        .background(Color.indigo)
+                        .cornerRadius(13)
                 }
+            }
+            .padding(.horizontal, 40)
+            .frame(maxHeight: .infinity)
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 10) {
+                    ForEach(viewModel.resources) { resource in
+                        NavigationLink {
+                            ResourceDetailView(studyViewModel: viewModel, resource: resource)
+                        } label: {
+                            ResourceCardView(resource: resource)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
         }
     }
 }
+
+struct ResourceCardView: View {
+    let resource: SDResource
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.indigo.opacity(0.1))
+                    .frame(width: 46, height: 46)
+                Image(systemName: resource.sourceName?.lowercased().hasSuffix(".pdf") == true
+                      ? "doc.richtext" : "doc.text")
+                    .font(.title3)
+                    .foregroundColor(.indigo)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(resource.title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                Text(resource.content)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+                if let src = resource.sourceName {
+                    Label(src, systemImage: "paperclip")
+                        .font(.caption2)
+                        .foregroundColor(.indigo)
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(14)
+        .background(Color(uiColor: .systemBackground))
+        .cornerRadius(14)
+        .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
+    }
+}
+
+// MARK: - Flashcards Tab
 
 struct FlashcardsTab: View {
     @ObservedObject var viewModel: StudyDetailViewModel
-    
+
     var body: some View {
         if viewModel.flashcards.isEmpty {
-            VStack(spacing: 20) {
-                Image(systemName: "square.stack.3d.up")
-                    .font(.system(size: 60))
-                    .foregroundColor(.gray.opacity(0.3))
-                Text("No hay flashcards generadas")
-                    .foregroundColor(.secondary)
-                Text("Agrega un recurso para que la IA pueda generar tus tarjetas de estudio.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
-        } else {
-            List(viewModel.flashcards) { card in
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(card.question)
+            VStack(spacing: 22) {
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(colors: [.purple.opacity(0.12), .indigo.opacity(0.08)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .frame(width: 100, height: 100)
+                    Image(systemName: "rectangle.stack.badge.plus")
+                        .font(.system(size: 42))
+                        .foregroundStyle(LinearGradient(colors: [.purple, .indigo],
+                                                        startPoint: .top, endPoint: .bottom))
+                }
+                VStack(spacing: 8) {
+                    Text("Sin flashcards todavía")
+                        .font(.headline)
+                    Text("Genera tarjetas con IA a partir de tus recursos\no crea una manualmente.")
                         .font(.subheadline)
-                        .fontWeight(.medium)
-                    
-                    HStack {
-                        ForEach(card.conceptTags, id: \.self) { tag in
-                            Text(tag)
-                                .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.blue.opacity(0.1))
-                                .foregroundColor(.blue)
-                                .cornerRadius(4)
-                        }
-                        Spacer()
-                        if let interval = card.intervalDays {
-                            Text("Repaso en \(interval) d")
-                                .font(.caption2)
-                                .foregroundColor(.gray)
-                        }
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                HStack(spacing: 12) {
+                    Button {
+                        viewModel.showingGenerateFlashcards = true
+                    } label: {
+                        Label("Con IA", systemImage: "wand.and.stars")
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(Color.purple)
+                            .cornerRadius(12)
+                    }
+                    .disabled(viewModel.resources.isEmpty)
+
+                    Button {
+                        viewModel.showingCreateFlashcardManual = true
+                    } label: {
+                        Label("Manual", systemImage: "pencil")
+                            .fontWeight(.semibold)
+                            .foregroundColor(.indigo)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(Color.indigo.opacity(0.1))
+                            .cornerRadius(12)
+                    }
+                    .disabled(viewModel.resources.isEmpty)
+                }
+            }
+            .padding(.horizontal, 40)
+            .frame(maxHeight: .infinity)
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 10) {
+                    ForEach(viewModel.flashcards) { card in
+                        FlashcardItemView(card: card)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
         }
     }
 }
 
+struct FlashcardItemView: View {
+    let card: SDFlashcard
+    @State private var isExpanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(card.type == .open ? Color.indigo : Color.purple)
+                    .frame(width: 3)
+                    .padding(.vertical, 2)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(card.type == .open ? "Abierta" : "Opción múltiple")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(card.type == .open ? .indigo : .purple)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background((card.type == .open ? Color.indigo : Color.purple).opacity(0.1))
+                            .cornerRadius(6)
+
+                        Spacer()
+
+                        if card.intervalDays > 0 {
+                            Label("en \(card.intervalDays)d", systemImage: "clock")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Text(card.question)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .lineLimit(isExpanded ? nil : 2)
+
+                    if isExpanded {
+                        Divider().padding(.vertical, 2)
+
+                        Text(card.answer)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+
+                        if !card.conceptTags.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(card.conceptTags, id: \.self) { tag in
+                                        Text("#\(tag)")
+                                            .font(.caption2)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(Color.teal.opacity(0.1))
+                                            .foregroundColor(.teal)
+                                            .cornerRadius(6)
+                                    }
+                                }
+                            }
+                            .padding(.top, 2)
+                        }
+                    }
+                }
+
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 3)
+            }
+            .padding(14)
+        }
+        .background(Color(uiColor: .systemBackground))
+        .cornerRadius(14)
+        .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.spring(response: 0.3)) { isExpanded.toggle() }
+        }
+    }
+}
+
+// MARK: - Progress Tab
+
 struct ProgressTab: View {
     @ObservedObject var viewModel: StudyDetailViewModel
-    
-    var body: some View {
-        if let gaps = viewModel.gaps {
-            let accValue = min(1, max(0, viewModel.attemptsSummary?.accuracy ?? 0))
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Accuracy Card
-                    VStack(spacing: 12) {
-                        Text("Precisión general")
-                            .font(.headline)
 
+    var body: some View {
+        if let gaps = viewModel.gapAnalysis {
+            let allAttempts = viewModel.flashcards.flatMap(\.attempts)
+            let totalAtt = allAttempts.count
+            let correctAtt = allAttempts.filter(\.isCorrect).count
+            let acc = totalAtt > 0 ? min(1, max(0, Double(correctAtt) / Double(totalAtt))) : 0.0
+            ScrollView {
+                VStack(spacing: 14) {
+                    // Accuracy card
+                    HStack(spacing: 20) {
                         ZStack {
                             Circle()
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 10)
-                                .frame(width: 100, height: 100)
-
+                                .stroke(Color.gray.opacity(0.15), lineWidth: 10)
+                                .frame(width: 90, height: 90)
                             Circle()
-                                .trim(from: 0, to: CGFloat(accValue))
-                                .stroke(Color.blue, style: StrokeStyle(lineWidth: 10, lineCap: .round))
-                                .frame(width: 100, height: 100)
+                                .trim(from: 0, to: CGFloat(acc))
+                                .stroke(
+                                    LinearGradient(colors: [.indigo, .teal],
+                                                   startPoint: .leading, endPoint: .trailing),
+                                    style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                                )
+                                .frame(width: 90, height: 90)
                                 .rotationEffect(.degrees(-90))
-
-                            Text("\(Int(accValue * 100))%")
+                                .animation(.easeOut(duration: 0.8), value: acc)
+                            Text("\(Int(acc * 100))%")
                                 .font(.title3)
                                 .fontWeight(.bold)
                         }
 
-                        if let summary = viewModel.attemptsSummary {
-                            Text("Total: \(summary.total) · Aciertos: \(summary.correct)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        } else {
-                            Text("\(gaps.total_attempts) intentos totales")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Precisión general")
+                                .font(.headline)
+                            StatRow(label: "Total", value: "\(totalAtt)")
+                            StatRow(label: "Aciertos", value: "\(correctAtt)", color: .green)
+                            StatRow(label: "Errores", value: "\(totalAtt - correctAtt)", color: .red)
                         }
+                        Spacer()
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.white)
+                    .padding(18)
+                    .background(Color(uiColor: .systemBackground))
                     .cornerRadius(16)
-                    
-                    // Gaps Section
+                    .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 3)
+
                     if !gaps.gaps.isEmpty {
-                        Text("🔴 Conceptos Débiles")
-                            .font(.headline)
-                        
-                        ForEach(gaps.gaps, id: \.concept) { gap in
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(gap.concept)
-                                        .font(.subheadline)
-                                        .fontWeight(.medium)
-                                    Text("\(gap.errors) errores en \(gap.total_attempts) intentos · \(gap.trend)")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                    if let det = gap.dominant_error_type {
-                                        Text("Error dominante: \(det.rawValue)")
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                                Spacer()
-                                Text("\(Int(gap.error_rate * 100))% error")
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                                    .padding(6)
-                                    .background(Color.red.opacity(0.1))
-                                    .cornerRadius(8)
-                            }
-                            .padding()
-                            .background(Color.white)
-                            .cornerRadius(12)
+                        ProgressSectionHeader(title: "Conceptos débiles",
+                                              systemImage: "exclamationmark.triangle.fill",
+                                              color: .orange)
+                        ForEach(gaps.gaps) { gap in
+                            GapCardView(gap: gap)
                         }
                     }
-                    
-                    // Strong Concepts Section
-                    if !gaps.strong_concepts.isEmpty {
-                        Text("🟢 Conceptos Fuertes")
-                            .font(.headline)
-                        
-                        ForEach(gaps.strong_concepts, id: \.concept) { strong in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(strong.concept)
-                                        .font(.subheadline)
-                                    Text("\(strong.total_attempts) intentos · \(Int(strong.error_rate * 100))% error")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                }
-                                Spacer()
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                            }
-                            .padding()
-                            .background(Color.white)
-                            .cornerRadius(12)
+
+                    if !gaps.strongConcepts.isEmpty {
+                        ProgressSectionHeader(title: "Conceptos fuertes",
+                                              systemImage: "checkmark.seal.fill",
+                                              color: .green)
+                        ForEach(gaps.strongConcepts) { concept in
+                            StrongConceptCardView(concept: concept)
                         }
                     }
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
         } else {
-            VStack {
+            VStack(spacing: 12) {
                 ProgressView()
                 Text("Analizando tu progreso...")
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundColor(.secondary)
-                    .padding()
             }
+            .frame(maxHeight: .infinity)
         }
     }
 }
+
+struct StatRow: View {
+    let label: String
+    let value: String
+    var color: Color = .primary
+
+    var body: some View {
+        HStack {
+            Text(label).font(.caption).foregroundColor(.secondary)
+            Spacer()
+            Text(value).font(.caption).fontWeight(.semibold).foregroundColor(color)
+        }
+    }
+}
+
+struct ProgressSectionHeader: View {
+    let title: String
+    let systemImage: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage).foregroundColor(color)
+            Text(title).font(.headline)
+            Spacer()
+        }
+    }
+}
+
+struct GapCardView: View {
+    let gap: ConceptGap
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle().fill(Color.orange.opacity(0.12)).frame(width: 44, height: 44)
+                Text("\(Int(gap.error_rate * 100))%")
+                    .font(.caption).fontWeight(.bold).foregroundColor(.orange)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(gap.concept).font(.subheadline).fontWeight(.medium)
+                Text("\(gap.errors) errores de \(gap.total_attempts) intentos · \(gap.trend)")
+                    .font(.caption2).foregroundColor(.secondary)
+                if let det = gap.dominant_error_type {
+                    Text("Error principal: \(det.rawValue)")
+                        .font(.caption2).foregroundColor(.orange.opacity(0.8))
+                }
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(Color(uiColor: .systemBackground))
+        .cornerRadius(14)
+        .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
+    }
+}
+
+struct StrongConceptCardView: View {
+    let concept: StrongConcept
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle().fill(Color.green.opacity(0.12)).frame(width: 44, height: 44)
+                Image(systemName: "checkmark").font(.subheadline).fontWeight(.bold).foregroundColor(.green)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(concept.concept).font(.subheadline).fontWeight(.medium)
+                Text("\(concept.total_attempts) intentos · \(Int(concept.error_rate * 100))% error")
+                    .font(.caption2).foregroundColor(.secondary)
+            }
+            Spacer()
+            Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+        }
+        .padding(14)
+        .background(Color(uiColor: .systemBackground))
+        .cornerRadius(14)
+        .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
+    }
+}
+
+// MARK: - Add Resource View
 
 struct AddResourceView: View {
     @ObservedObject var viewModel: StudyDetailViewModel
@@ -357,9 +638,7 @@ struct AddResourceView: View {
 
                 if let importError {
                     Section {
-                        Text(importError)
-                            .font(.caption)
-                            .foregroundColor(.red)
+                        Text(importError).font(.caption).foregroundColor(.red)
                     }
                 }
             }
@@ -378,10 +657,8 @@ struct AddResourceView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Guardar") {
-                        Task {
-                            await viewModel.createResource()
-                            dismiss()
-                        }
+                        viewModel.createResource()
+                        dismiss()
                     }
                     .fontWeight(.bold)
                     .disabled(viewModel.resourceTitle.isEmpty || viewModel.resourceContent.isEmpty)
@@ -398,9 +675,7 @@ struct AddResourceView: View {
         case .success(let urls):
             guard let url = urls.first else { return }
             let access = url.startAccessingSecurityScopedResource()
-            defer {
-                if access { url.stopAccessingSecurityScopedResource() }
-            }
+            defer { if access { url.stopAccessingSecurityScopedResource() } }
             isExtracting = true
             do {
                 let text = try await DocumentTextExtractor.extractText(from: url)
@@ -412,40 +687,179 @@ struct AddResourceView: View {
                     }
                 }
             } catch {
-                await MainActor.run {
-                    importError = error.localizedDescription
-                }
+                await MainActor.run { importError = error.localizedDescription }
             }
             await MainActor.run { isExtracting = false }
         }
     }
 }
 
-#if DEBUG
-#Preview("Estudio — detalle") {
-    NavigationStack {
-        StudyDetailView(study: Study(
-            id: UUID(),
-            title: "Biología Celular",
-            description: "Apuntes del parcial 2",
-            createdAt: Date()
-        ))
+// MARK: - Create Flashcard Manually
+
+struct CreateFlashcardManualView: View {
+    @ObservedObject var viewModel: StudyDetailViewModel
+    @Environment(\.dismiss) var dismiss
+
+    @State private var question = ""
+    @State private var answer = ""
+    @State private var tagsText = ""
+    @State private var cardType: FlashcardType = .open
+    @State private var selectedResourceId: UUID?
+    @State private var distractor1 = ""
+    @State private var distractor2 = ""
+    @State private var distractor3 = ""
+    @State private var isSaving = false
+
+    private var effectiveResourceId: UUID? {
+        selectedResourceId ?? viewModel.resources.first?.id
+    }
+
+    private var canSave: Bool {
+        !question.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !answer.trimmingCharacters(in: .whitespaces).isEmpty &&
+        effectiveResourceId != nil &&
+        (cardType == .open || !distractor1.trimmingCharacters(in: .whitespaces).isEmpty)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    if viewModel.resources.isEmpty {
+                        Label("Primero agrega un recurso al estudio.", systemImage: "exclamationmark.triangle")
+                            .foregroundColor(.orange)
+                            .font(.subheadline)
+                    } else if viewModel.resources.count == 1 {
+                        HStack {
+                            Image(systemName: "doc.text")
+                                .foregroundColor(.indigo)
+                            Text(viewModel.resources[0].title)
+                        }
+                    } else {
+                        Picker("Recurso", selection: Binding(
+                            get: { effectiveResourceId ?? UUID() },
+                            set: { selectedResourceId = $0 }
+                        )) {
+                            ForEach(viewModel.resources) { r in
+                                Text(r.title).tag(r.id)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Recurso asociado")
+                }
+
+                Section {
+                    Picker("Tipo", selection: $cardType) {
+                        Text("Respuesta abierta").tag(FlashcardType.open)
+                        Text("Opción múltiple").tag(FlashcardType.multipleChoice)
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Tipo de tarjeta")
+                }
+
+                Section {
+                    TextEditor(text: $question)
+                        .frame(minHeight: 80)
+                } header: {
+                    Text("Pregunta")
+                }
+
+                Section {
+                    TextEditor(text: $answer)
+                        .frame(minHeight: 60)
+                } header: {
+                    Text("Respuesta correcta")
+                }
+
+                if cardType == .multipleChoice {
+                    Section {
+                        TextField("Distractor 1 (obligatorio)", text: $distractor1)
+                        TextField("Distractor 2", text: $distractor2)
+                        TextField("Distractor 3", text: $distractor3)
+                    } header: {
+                        Text("Respuestas incorrectas")
+                    } footer: {
+                        Text("Al menos un distractor es obligatorio para opción múltiple.")
+                    }
+                }
+
+                Section {
+                    TextField("fotosíntesis, cloroplasto, ...", text: $tagsText)
+                } header: {
+                    Text("Etiquetas de concepto")
+                } footer: {
+                    Text("Opcional. Separa los conceptos con comas.")
+                }
+            }
+            .navigationTitle("Nueva Flashcard")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancelar") { dismiss() }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        save()
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                        } else {
+                            Text("Guardar").fontWeight(.bold)
+                        }
+                    }
+                    .disabled(!canSave || isSaving)
+                }
+            }
+            .onAppear {
+                if selectedResourceId == nil {
+                    selectedResourceId = viewModel.resources.first?.id
+                }
+            }
+        }
+    }
+
+    private func save() {
+        guard let resourceId = effectiveResourceId else { return }
+        isSaving = true
+
+        let tags = tagsText
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+
+        var options: FlashcardOptions?
+        if cardType == .multipleChoice {
+            let distractors = [distractor1, distractor2, distractor3]
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            options = FlashcardOptions(correct: answer.trimmingCharacters(in: .whitespaces),
+                                       distractors: distractors)
+        }
+
+        let success = viewModel.createFlashcardManually(
+            question: question.trimmingCharacters(in: .whitespaces),
+            answer: answer.trimmingCharacters(in: .whitespaces),
+            tags: tags,
+            resourceId: resourceId,
+            type: cardType,
+            options: options
+        )
+
+        isSaving = false
+        if success { dismiss() }
     }
 }
 
-#Preview("Agregar recurso") {
-    AddResourceView(viewModel: StudyDetailViewModel.previewMock())
-}
+// MARK: - Previews
 
-#Preview("Pestaña recursos") {
-    ResourcesTab(viewModel: StudyDetailViewModel.previewMock())
-}
-
-#Preview("Pestaña flashcards") {
-    FlashcardsTab(viewModel: StudyDetailViewModel.previewWithProgress())
-}
-
-#Preview("Pestaña progreso") {
-    ProgressTab(viewModel: StudyDetailViewModel.previewWithProgress())
+#if DEBUG
+#Preview("Estudio — detalle") {
+    let study = SDStudy(title: "Biología Celular", desc: "Apuntes del parcial 2")
+    return NavigationStack {
+        StudyDetailView(study: study)
+    }
+    .modelContainer(for: [SDStudy.self, SDResource.self, SDFlashcard.self, SDAttempt.self], inMemory: true)
 }
 #endif

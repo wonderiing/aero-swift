@@ -1,10 +1,11 @@
 import SwiftUI
+import SwiftData
 import Combine
 
 @MainActor
 final class PracticeSessionViewModel: ObservableObject {
-    let studyId: UUID
-    @Published var flashcards: [Flashcard] = []
+    let study: SDStudy
+    @Published var flashcards: [SDFlashcard] = []
     @Published var currentIndex = 0
     @Published var isShowingAnswer = false
     @Published var userAnswer = ""
@@ -13,7 +14,7 @@ final class PracticeSessionViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var isSessionFinished = false
 
-    @Published var evaluationResult: Attempt?
+    @Published var evaluationResult: SDAttempt?
     @Published var isEvaluating = false
 
     @Published var sessionCorrectCount = 0
@@ -23,34 +24,32 @@ final class PracticeSessionViewModel: ObservableObject {
     @Published var isExpandingExplanation = false
     @Published var lastEvaluationUsedAppleIntelligence = false
 
-    private let flashcardService = FlashcardService.shared
-    private let attemptService = AttemptService.shared
+    var modelContext: ModelContext?
 
-    init(studyId: UUID) {
-        self.studyId = studyId
+    init(study: SDStudy) {
+        self.study = study
     }
 
-    func startSession() async {
+    func startSession() {
         isLoading = true
         sessionCorrectCount = 0
         sessionAnsweredCount = 0
-        do {
-            async let queueTask = flashcardService.getReviewQueue(studyId: studyId)
-            async let gapsTask = attemptService.getGaps(studyId: studyId)
-            let queue = try await queueTask
-            let gaps = try await gapsTask
-            flashcards = prioritizeQueue(queue, gaps: gaps)
-            currentIndex = 0
-            prepareCurrentCard()
-        } catch {
-            flashcards = []
-        }
+
+        let now = Date()
+        let queue = study.flashcards
+            .filter { $0.nextReviewAt <= now }
+            .sorted { $0.nextReviewAt < $1.nextReviewAt }
+
+        let analysis = GapAnalysis.compute(flashcards: study.flashcards)
+        flashcards = prioritizeQueue(queue, gaps: analysis)
+        currentIndex = 0
+        prepareCurrentCard()
         isLoading = false
     }
 
-    private func prioritizeQueue(_ queue: [Flashcard], gaps: GapsResponse) -> [Flashcard] {
+    private func prioritizeQueue(_ queue: [SDFlashcard], gaps: GapAnalysis) -> [SDFlashcard] {
         let weakSet = Set(gaps.gaps.map { $0.concept.lowercased() })
-        let scored = queue.map { card -> (Flashcard, Int) in
+        let scored = queue.map { card -> (SDFlashcard, Int) in
             let hits = card.conceptTags.filter { weakSet.contains($0.lowercased()) }.count
             return (card, hits)
         }
@@ -88,7 +87,7 @@ final class PracticeSessionViewModel: ObservableObject {
     }
 
     func submitAnswer() async {
-        guard currentIndex < flashcards.count else { return }
+        guard let ctx = modelContext, currentIndex < flashcards.count else { return }
         let currentCard = flashcards[currentIndex]
 
         isEvaluating = true
@@ -126,8 +125,16 @@ final class PracticeSessionViewModel: ObservableObject {
             )
         }
 
+        // Save attempt + update SM-2
+        let attempt = SDAttempt(dto: dto, flashcard: currentCard)
+        ctx.insert(attempt)
+
+        let quality = currentCard.sm2Quality(isCorrect: dto.isCorrect, confidence: dto.confidenceScore ?? 0)
+        currentCard.updateSM2(quality: quality)
+
         do {
-            evaluationResult = try await attemptService.create(flashcardId: currentCard.id, dto: dto)
+            try ctx.save()
+            evaluationResult = attempt
             sessionAnsweredCount += 1
             if dto.isCorrect { sessionCorrectCount += 1 }
             isShowingAnswer = true
@@ -138,12 +145,10 @@ final class PracticeSessionViewModel: ObservableObject {
         isEvaluating = false
     }
 
-    private func answerTextForEvaluation(card: Flashcard) -> String? {
+    private func answerTextForEvaluation(card: SDFlashcard) -> String? {
         switch card.type {
-        case .open:
-            return userAnswer
-        case .multipleChoice:
-            return selectedMCOption
+        case .open: return userAnswer
+        case .multipleChoice: return selectedMCOption
         }
     }
 
@@ -178,26 +183,4 @@ final class PracticeSessionViewModel: ObservableObject {
             isSessionFinished = true
         }
     }
-
-    #if DEBUG
-    static func previewVM(studyId: UUID = UUID()) -> PracticeSessionViewModel {
-        let vm = PracticeSessionViewModel(studyId: studyId)
-        vm.flashcards = [
-            Flashcard(
-                id: UUID(),
-                question: "¿Dónde ocurre la fotosíntesis?",
-                answer: "En los cloroplastos.",
-                type: .open,
-                options: nil,
-                conceptTags: ["cloroplasto"],
-                nextReviewAt: nil,
-                easeFactor: 2.5,
-                intervalDays: 1,
-                createdAt: Date()
-            )
-        ]
-        vm.prepareCurrentCard()
-        return vm
-    }
-    #endif
 }

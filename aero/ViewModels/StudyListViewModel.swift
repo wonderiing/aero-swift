@@ -1,8 +1,9 @@
 import SwiftUI
+import SwiftData
 import Combine
 
-struct StudyRowModel: Identifiable, Sendable {
-    let study: Study
+struct StudyRowModel: Identifiable {
+    let study: SDStudy
     var pendingReviewCount: Int = 0
     var accuracy: Double?
     var lastPractice: Date?
@@ -20,82 +21,69 @@ final class StudyListViewModel: ObservableObject {
     @Published var newStudyTitle = ""
     @Published var newStudyDescription = ""
 
-    private let studyService = StudyService.shared
-    private let flashcardService = FlashcardService.shared
-    private let attemptService = AttemptService.shared
+    var modelContext: ModelContext?
 
-    func fetchStudies() async {
+    func fetchStudies() {
+        guard let ctx = modelContext else { return }
         isLoading = true
         errorMessage = nil
 
         do {
-            let studies = try await studyService.listAll()
-            rows = studies.map { StudyRowModel(study: $0) }
+            let descriptor = FetchDescriptor<SDStudy>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
+            let studies = try ctx.fetch(descriptor)
+            let now = Date()
+            rows = studies.map { study in
+                let pending = study.flashcards.filter { $0.nextReviewAt <= now }.count
+                let allAttempts = study.flashcards.flatMap(\.attempts)
+                let total = allAttempts.count
+                let correct = allAttempts.filter(\.isCorrect).count
+                let accuracy: Double? = total > 0 ? Double(correct) / Double(total) : nil
+                let lastPractice = allAttempts.map(\.answeredAt).max()
+
+                return StudyRowModel(
+                    study: study,
+                    pendingReviewCount: pending,
+                    accuracy: accuracy,
+                    lastPractice: lastPractice
+                )
+            }
         } catch {
             errorMessage = "Error al cargar estudios: \(error.localizedDescription)"
         }
 
         isLoading = false
-        await enrichRows()
-    }
-
-    private func enrichRows() async {
-        let fc = flashcardService
-        let att = attemptService
-        let snapshot = rows
-        var map: [UUID: (Int, Double?, Date?)] = [:]
-        await withTaskGroup(of: (UUID, Int, Double?, Date?).self) { group in
-            for row in snapshot {
-                let studyId = row.study.id
-                group.addTask {
-                    async let queueCount = (try? await fc.getReviewQueue(studyId: studyId))?.count ?? 0
-                    async let attempts = try? await att.listForStudy(studyId: studyId)
-                    let q = await queueCount
-                    let a = await attempts
-                    let last = a?.attempts.compactMap(\.answeredAt).max()
-                    return (studyId, q, a?.accuracy, last)
-                }
-            }
-            for await item in group {
-                map[item.0] = (item.1, item.2, item.3)
-            }
-        }
-        for i in rows.indices {
-            let id = rows[i].study.id
-            if let e = map[id] {
-                rows[i].pendingReviewCount = e.0
-                rows[i].accuracy = e.1
-                rows[i].lastPractice = e.2
-            }
-        }
     }
 
     @discardableResult
-    func createStudy() async -> Bool {
-        guard !newStudyTitle.isEmpty && !newStudyDescription.isEmpty else { return false }
+    func createStudy() -> Bool {
+        guard let ctx = modelContext,
+              !newStudyTitle.isEmpty && !newStudyDescription.isEmpty else { return false }
 
-        isLoading = true
-        errorMessage = nil
+        let study = SDStudy(title: newStudyTitle, desc: newStudyDescription)
+        ctx.insert(study)
 
         do {
-            let dto = CreateStudyDto(title: newStudyTitle, description: newStudyDescription)
-            _ = try await studyService.create(dto: dto)
-            await fetchStudies()
-            newStudyTitle = ""
-            newStudyDescription = ""
-            isLoading = false
-            return true
+            try ctx.save()
         } catch {
             errorMessage = "Error al crear estudio: \(error.localizedDescription)"
-            isLoading = false
             return false
         }
+
+        newStudyTitle = ""
+        newStudyDescription = ""
+        fetchStudies()
+        return true
     }
 
-    func deleteStudy(id: UUID) async {
+    func deleteStudy(id: UUID) {
+        guard let ctx = modelContext else { return }
         do {
-            try await studyService.delete(id: id)
-            await fetchStudies()
+            let descriptor = FetchDescriptor<SDStudy>(predicate: #Predicate { $0.id == id })
+            if let study = try ctx.fetch(descriptor).first {
+                ctx.delete(study)
+                try ctx.save()
+                fetchStudies()
+            }
         } catch {
             errorMessage = "Error al eliminar estudio: \(error.localizedDescription)"
         }

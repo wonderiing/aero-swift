@@ -1,142 +1,165 @@
 import SwiftUI
+import SwiftData
 import Combine
 
 @MainActor
 final class StudyDetailViewModel: ObservableObject {
-    let study: Study
-    @Published var resources: [Resource] = []
-    @Published var flashcards: [Flashcard] = []
-    @Published var reviewQueue: [Flashcard] = []
-    @Published var gaps: GapsResponse?
-    @Published var attemptsSummary: StudyAttemptsResponse?
+    let study: SDStudy
+    @Published var resources: [SDResource] = []
+    @Published var flashcards: [SDFlashcard] = []
+    @Published var reviewQueue: [SDFlashcard] = []
+    @Published var gapAnalysis: GapAnalysis?
     @Published var isLoading = false
     @Published var errorMessage: String?
-    
+
     @Published var showingAddResource = false
     @Published var showingGenerateFlashcards = false
+    @Published var showingCreateFlashcardManual = false
     @Published var resourceTitle = ""
     @Published var resourceContent = ""
     @Published var resourceSourceName: String?
-    
-    private let resourceService = ResourceService.shared
-    private let flashcardService = FlashcardService.shared
-    private let attemptService = AttemptService.shared
-    
-    init(study: Study) {
+
+    var modelContext: ModelContext?
+
+    init(study: SDStudy) {
         self.study = study
     }
-    
-    func fetchContent() async {
-        isLoading = true
-        errorMessage = nil
-        
-        do {
-            async let resourcesRes = try resourceService.list(studyId: study.id)
-            async let flashcardsRes = try flashcardService.list(studyId: study.id)
-            async let reviewQueueRes = try flashcardService.getReviewQueue(studyId: study.id)
-            async let gapsRes = try attemptService.getGaps(studyId: study.id)
-            async let attemptsRes = try attemptService.listForStudy(studyId: study.id)
-            
-            self.resources = try await resourcesRes
-            self.flashcards = try await flashcardsRes
-            self.reviewQueue = try await reviewQueueRes
-            self.gaps = try await gapsRes
-            self.attemptsSummary = try await attemptsRes
-            
-        } catch {
-            errorMessage = "Error al cargar el estudio: \(error.localizedDescription)"
-        }
-        
-        isLoading = false
+
+    func fetchContent() {
+        resources = study.resources.sorted { ($0.createdAt) > ($1.createdAt) }
+        flashcards = study.flashcards.sorted { ($0.createdAt) > ($1.createdAt) }
+        reviewQueue = study.flashcards.filter { $0.nextReviewAt <= Date() }
+            .sorted { $0.nextReviewAt < $1.nextReviewAt }
+        gapAnalysis = GapAnalysis.compute(flashcards: study.flashcards)
     }
-    
-    func createResource() async {
-        guard !resourceTitle.isEmpty && !resourceContent.isEmpty else { return }
-        
+
+    func createResource() {
+        guard let ctx = modelContext,
+              !resourceTitle.isEmpty && !resourceContent.isEmpty else { return }
+
         isLoading = true
-        
+        let resource = SDResource(title: resourceTitle, content: resourceContent, sourceName: resourceSourceName, study: study)
+        ctx.insert(resource)
+
         do {
-            let dto = CreateResourceDto(title: resourceTitle, content: resourceContent, sourceName: resourceSourceName)
-            _ = try await resourceService.create(studyId: study.id, dto: dto)
-            await fetchContent()
+            try ctx.save()
             showingAddResource = false
             resourceTitle = ""
             resourceContent = ""
             resourceSourceName = nil
+            fetchContent()
         } catch {
             errorMessage = "Error al agregar recurso: \(error.localizedDescription)"
         }
-        
         isLoading = false
     }
 
-    func updateResource(id: UUID, title: String, content: String) async throws {
-        let dto = UpdateResourceDto(title: title, content: content)
-        _ = try await resourceService.update(id: id, dto: dto)
-        await fetchContent()
+    func updateResource(id: UUID, title: String, content: String) {
+        guard let ctx = modelContext else { return }
+        if let resource = study.resources.first(where: { $0.id == id }) {
+            resource.title = title
+            resource.content = content
+            do {
+                try ctx.save()
+                fetchContent()
+            } catch {
+                errorMessage = "Error al actualizar recurso: \(error.localizedDescription)"
+            }
+        }
     }
 
-    func saveFlashcardBatch(_ dtos: [CreateFlashcardDto]) async throws {
-        _ = try await flashcardService.createBatch(studyId: study.id, dtos: dtos)
-        await fetchContent()
+    func createFlashcardManually(
+        question: String,
+        answer: String,
+        tags: [String],
+        resourceId: UUID,
+        type: FlashcardType,
+        options: FlashcardOptions?
+    ) -> Bool {
+        guard let ctx = modelContext else { return false }
+        let resource = study.resources.first { $0.id == resourceId }
+
+        let card = SDFlashcard(
+            question: question,
+            answer: answer,
+            type: type,
+            options: options,
+            conceptTags: tags,
+            study: study,
+            resource: resource
+        )
+        ctx.insert(card)
+
+        do {
+            try ctx.save()
+            fetchContent()
+            return true
+        } catch {
+            errorMessage = "Error al crear flashcard: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    func saveFlashcardBatch(_ dtos: [CreateFlashcardDto]) {
+        guard let ctx = modelContext else { return }
+
+        let resourceMap = Dictionary(uniqueKeysWithValues: study.resources.map { ($0.id, $0) })
+
+        for dto in dtos {
+            let card = SDFlashcard(
+                question: dto.question,
+                answer: dto.answer,
+                type: dto.type ?? .open,
+                options: dto.options,
+                conceptTags: dto.conceptTags,
+                study: study,
+                resource: resourceMap[dto.resourceId]
+            )
+            ctx.insert(card)
+        }
+
+        do {
+            try ctx.save()
+            fetchContent()
+        } catch {
+            errorMessage = "Error al guardar flashcards: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Attempts (used by practice session)
+
+    func recordAttempt(flashcard: SDFlashcard, dto: CreateAttemptDto) -> SDAttempt? {
+        guard let ctx = modelContext else { return nil }
+
+        let attempt = SDAttempt(dto: dto, flashcard: flashcard)
+        ctx.insert(attempt)
+
+        // Update SM-2
+        let quality = flashcard.sm2Quality(isCorrect: dto.isCorrect, confidence: dto.confidenceScore ?? 0)
+        flashcard.updateSM2(quality: quality)
+
+        do {
+            try ctx.save()
+            return attempt
+        } catch {
+            errorMessage = "Error al guardar intento: \(error.localizedDescription)"
+            return nil
+        }
     }
 
     #if DEBUG
-    /// Datos de ejemplo para `#Preview`.
     @MainActor
     static func previewMock(
-        resources: [Resource] = [
-            Resource(
-                id: UUID(),
-                title: "Fotosíntesis",
-                content: "La fotosíntesis es el proceso por el cual las plantas convierten luz en energía química en los cloroplastos. Libera oxígeno.",
-                sourceName: nil,
-                createdAt: Date()
-            )
-        ]
+        resources: [SDResource]? = nil
     ) -> StudyDetailViewModel {
-        let study = Study(id: UUID(), title: "Biología (preview)", description: "Vista previa de Xcode", createdAt: Date())
+        let study = SDStudy(title: "Biología (preview)", desc: "Vista previa de Xcode")
         let vm = StudyDetailViewModel(study: study)
-        vm.resources = resources
         return vm
     }
 
     @MainActor
     static func previewWithProgress() -> StudyDetailViewModel {
         let vm = previewMock()
-        vm.gaps = GapsResponse(
-            study_id: vm.study.id,
-            total_attempts: 12,
-            gaps: [
-                ConceptGap(
-                    concept: "fase oscura",
-                    error_rate: 0.55,
-                    total_attempts: 6,
-                    errors: 3,
-                    dominant_error_type: .conceptual,
-                    trend: "estable",
-                    last_seen: Date()
-                )
-            ],
-            strong_concepts: [
-                StrongConcept(concept: "cloroplasto", error_rate: 0.12, total_attempts: 10)
-            ]
-        )
-        vm.attemptsSummary = StudyAttemptsResponse(total: 12, correct: 8, accuracy: 2.0 / 3.0, attempts: [])
-        vm.flashcards = [
-            Flashcard(
-                id: UUID(),
-                question: "¿Dónde ocurre?",
-                answer: "En el estroma.",
-                type: .open,
-                options: nil,
-                conceptTags: ["estroma"],
-                nextReviewAt: nil,
-                easeFactor: 2.5,
-                intervalDays: 1,
-                createdAt: Date()
-            )
-        ]
         return vm
     }
     #endif
