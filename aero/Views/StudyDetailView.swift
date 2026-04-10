@@ -9,6 +9,7 @@ struct StudyDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedTab = 0
+    @State private var showingAnkiSession = false
 
     init(study: SDStudy) {
         _viewModel = StateObject(wrappedValue: StudyDetailViewModel(study: study))
@@ -21,19 +22,28 @@ struct StudyDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            StudyHeroHeader(study: viewModel.study, reviewCount: viewModel.reviewQueue.count, isLargeCanvas: isLargeCanvas)
+            StudyHeroHeader(
+                study: viewModel.study,
+                reviewCount: viewModel.reviewQueue.count,
+                ankiCardCount: viewModel.ankiCards.count,
+                ankiDueCount: viewModel.ankiReviewQueue.count,
+                isLargeCanvas: isLargeCanvas,
+                onStartAnkiSession: { showingAnkiSession = true }
+            )
             StudyTabPicker(selectedTab: $selectedTab, isLargeCanvas: isLargeCanvas)
 
             ZStack {
                 AeroAppBackground()
 
-                if viewModel.isLoading && viewModel.resources.isEmpty && viewModel.flashcards.isEmpty {
+                if viewModel.isLoading && viewModel.resources.isEmpty && viewModel.flashcards.isEmpty && viewModel.ankiCards.isEmpty {
                     ProgressView().frame(maxHeight: .infinity)
                 } else {
                     TabView(selection: $selectedTab) {
                         ResourcesTab(viewModel: viewModel, isLargeCanvas: isLargeCanvas).tag(0)
-                        FlashcardsTab(viewModel: viewModel, isLargeCanvas: isLargeCanvas).tag(1)
-                        ProgressTab(viewModel: viewModel, isLargeCanvas: isLargeCanvas).tag(2)
+                        AnkiCardsTab(viewModel: viewModel, isLargeCanvas: isLargeCanvas).tag(1)
+                        ExamenSimuladoTab(viewModel: viewModel, isLargeCanvas: isLargeCanvas).tag(2)
+                        ProgressTab(viewModel: viewModel, isLargeCanvas: isLargeCanvas).tag(3)
+                        StudyCanvasTab(viewModel: viewModel, isLargeCanvas: isLargeCanvas).tag(4)
                     }
                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                     .frame(maxWidth: contentWidth)
@@ -52,6 +62,13 @@ struct StudyDetailView: View {
                         Image(systemName: "plus.circle")
                     }
                 } else if selectedTab == 1 {
+                    Button {
+                        viewModel.showingGenerateAnkiCards = true
+                    } label: {
+                        Image(systemName: "plus.circle")
+                    }
+                    .disabled(viewModel.resources.isEmpty)
+                } else if selectedTab == 2 {
                     Menu {
                         Button {
                             viewModel.showingGenerateFlashcards = true
@@ -80,11 +97,17 @@ struct StudyDetailView: View {
         .sheet(isPresented: $viewModel.showingGenerateFlashcards) {
             GenerateFlashcardsSheet(viewModel: viewModel)
         }
+        .sheet(isPresented: $viewModel.showingGenerateAnkiCards) {
+            GenerateAnkiCardsSheet(viewModel: viewModel)
+        }
         .sheet(isPresented: $viewModel.showingCreateFlashcardManual) {
             CreateFlashcardManualView(viewModel: viewModel)
         }
         .sheet(isPresented: $viewModel.showingGenerateFromGaps) {
             GenerateFromGapsSheet(viewModel: viewModel)
+        }
+        .fullScreenCover(isPresented: $showingAnkiSession) {
+            AnkiSessionView(viewModel: viewModel)
         }
         .onAppear {
             viewModel.modelContext = modelContext
@@ -98,7 +121,12 @@ struct StudyDetailView: View {
 struct StudyHeroHeader: View {
     let study: SDStudy
     let reviewCount: Int
+    let ankiCardCount: Int
+    let ankiDueCount: Int
     let isLargeCanvas: Bool
+    var onStartAnkiSession: (() -> Void)? = nil
+
+    private var hasPractice: Bool { reviewCount > 0 || ankiCardCount > 0 }
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -120,18 +148,45 @@ struct StudyHeroHeader: View {
                     .foregroundStyle(.white.opacity(0.8))
                     .lineLimit(isLargeCanvas ? 3 : 2)
 
-                if reviewCount > 0 {
-                    NavigationLink(destination: PracticeSessionView(study: study)) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "play.fill").font(.caption)
-                            Text("Practicar · \(reviewCount) tarjeta\(reviewCount == 1 ? "" : "s")")
-                                .fontWeight(.semibold)
-                                .font(isLargeCanvas ? .body : .subheadline)
+                if hasPractice {
+                    HStack(spacing: 10) {
+                        if ankiCardCount > 0 {
+                            Button {
+                                onStartAnkiSession?()
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "rectangle.on.rectangle.angled").font(.caption)
+                                    if ankiDueCount > 0 {
+                                        Text("Flashcards · \(ankiDueCount) pendiente\(ankiDueCount == 1 ? "" : "s")")
+                                            .fontWeight(.semibold)
+                                            .font(isLargeCanvas ? .body : .subheadline)
+                                    } else {
+                                        Text("Flashcards · Repasar todo")
+                                            .fontWeight(.semibold)
+                                            .font(isLargeCanvas ? .body : .subheadline)
+                                    }
+                                }
+                                .foregroundStyle(Color(red: 0.08, green: 0.55, blue: 0.55))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, isLargeCanvas ? 12 : 9)
+                                .background(Color.white, in: Capsule())
+                            }
                         }
-                        .foregroundStyle(Color(red: 0.28, green: 0.22, blue: 0.92))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, isLargeCanvas ? 12 : 9)
-                        .background(Color.white, in: Capsule())
+
+                        if reviewCount > 0 {
+                            NavigationLink(destination: PracticeSessionView(study: study)) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "doc.questionmark.fill").font(.caption)
+                                    Text("Examen · \(reviewCount)")
+                                        .fontWeight(.semibold)
+                                        .font(isLargeCanvas ? .body : .subheadline)
+                                }
+                                .foregroundStyle(Color(red: 0.28, green: 0.22, blue: 0.92))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, isLargeCanvas ? 12 : 9)
+                                .background(Color.white, in: Capsule())
+                            }
+                        }
                     }
                     .padding(.top, 4)
                 }
@@ -141,7 +196,7 @@ struct StudyHeroHeader: View {
             .padding(.top, isLargeCanvas ? 22 : 16)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: reviewCount > 0 ? (isLargeCanvas ? 220 : 178) : (isLargeCanvas ? 164 : 128))
+        .frame(height: hasPractice ? (isLargeCanvas ? 220 : 178) : (isLargeCanvas ? 164 : 128))
     }
 }
 
@@ -153,8 +208,10 @@ struct StudyTabPicker: View {
 
     private let tabs: [(String, String)] = [
         ("Recursos", "doc.text"),
-        ("Flashcards", "rectangle.stack"),
-        ("Progreso", "chart.bar")
+        ("Flashcards", "rectangle.on.rectangle.angled"),
+        ("Examen", "doc.questionmark.fill"),
+        ("Progreso", "chart.bar"),
+        ("Pizarra", "scribble.variable")
     ]
 
     var body: some View {
@@ -283,9 +340,179 @@ struct ResourceCardView: View {
     }
 }
 
-// MARK: - Flashcards Tab
+// MARK: - Anki Cards Tab (Flashcards estilo Anki)
 
-struct FlashcardsTab: View {
+struct AnkiCardsTab: View {
+    @ObservedObject var viewModel: StudyDetailViewModel
+    let isLargeCanvas: Bool
+    @State private var showingSession = false
+
+    private var columns: [GridItem] {
+        isLargeCanvas
+            ? [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+            : [GridItem(.flexible())]
+    }
+
+    private var dueCount: Int { viewModel.ankiReviewQueue.count }
+    private var totalCount: Int { viewModel.ankiCards.count }
+
+    var body: some View {
+        if viewModel.ankiCards.isEmpty {
+            ContentUnavailableView(
+                "Sin flashcards todavía",
+                systemImage: "rectangle.on.rectangle.angled",
+                description: Text("Genera flashcards simples frente/dorso con IA para memorizar con repetición espaciada.")
+            )
+            .overlay(alignment: .bottom) {
+                Button {
+                    viewModel.showingGenerateAnkiCards = true
+                } label: {
+                    Label("Generar con IA", systemImage: "wand.and.stars")
+                        .fontWeight(.semibold)
+                }
+                .buttonStyle(AeroPrimaryButtonStyle(disabled: viewModel.resources.isEmpty))
+                .disabled(viewModel.resources.isEmpty)
+                .controlSize(isLargeCanvas ? .large : .regular)
+                .padding(.horizontal, 40)
+                .padding(.bottom, 34)
+            }
+        } else {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 10) {
+                    ForEach(viewModel.ankiCards) { card in
+                        AnkiCardItemView(card: card, isLargeCanvas: isLargeCanvas) {
+                            viewModel.deleteAnkiCard(id: card.id)
+                        }
+                    }
+                }
+                .padding(.horizontal, isLargeCanvas ? 24 : 16)
+                .padding(.top, 12)
+                .padding(.bottom, 90)
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    showingSession = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "play.fill")
+                        if dueCount > 0 {
+                            Text("Practicar · \(dueCount) pendiente\(dueCount == 1 ? "" : "s")")
+                                .fontWeight(.semibold)
+                        } else {
+                            Text("Repasar todo · \(totalCount) tarjeta\(totalCount == 1 ? "" : "s")")
+                                .fontWeight(.semibold)
+                        }
+                        Spacer()
+                        if dueCount > 0 {
+                            Text("SM-2")
+                                .font(.caption2)
+                                .padding(.horizontal, 6).padding(.vertical, 3)
+                                .background(.white.opacity(0.2), in: Capsule())
+                        } else {
+                            Text("Libre")
+                                .font(.caption2)
+                                .padding(.horizontal, 6).padding(.vertical, 3)
+                                .background(.white.opacity(0.2), in: Capsule())
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18).padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(LinearGradient(
+                                colors: dueCount > 0 ? [.indigo, .purple] : [.teal, .indigo],
+                                startPoint: .leading, endPoint: .trailing
+                            ))
+                            .shadow(color: .indigo.opacity(0.3), radius: 14, y: 6)
+                    )
+                }
+                .padding(.horizontal, isLargeCanvas ? 24 : 16)
+                .padding(.top, 10).padding(.bottom, 16)
+                .background(.ultraThinMaterial)
+            }
+            .fullScreenCover(isPresented: $showingSession) {
+                AnkiSessionView(viewModel: viewModel)
+            }
+        }
+    }
+}
+
+struct AnkiCardItemView: View {
+    let card: SDAnkiCard
+    let isLargeCanvas: Bool
+    var onDelete: (() -> Void)? = nil
+    @State private var isFlipped = false
+
+    var body: some View {
+        Button {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) { isFlipped.toggle() }
+        } label: {
+            AeroSurfaceCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .center) {
+                        Label("Flashcard", systemImage: "rectangle.on.rectangle.angled")
+                            .font(.caption).fontWeight(.semibold)
+                            .foregroundStyle(Color.teal)
+                            .padding(.horizontal, 9).padding(.vertical, 4)
+                            .background(Color.teal.opacity(0.1))
+                            .clipShape(.rect(cornerRadius: 7))
+
+                        Spacer()
+
+                        if card.intervalDays > 0 {
+                            Label("en \(card.intervalDays)d", systemImage: "clock")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+
+                        Image(systemName: isFlipped ? "arrow.uturn.backward.circle" : "arrow.uturn.forward.circle")
+                            .font(.caption).fontWeight(.semibold).foregroundStyle(.secondary)
+                            .padding(.leading, 4)
+                    }
+
+                    if !isFlipped {
+                        Text(card.front)
+                            .font(isLargeCanvas ? .callout : .body)
+                            .fontWeight(.medium)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        Text(card.back)
+                            .font(isLargeCanvas ? .body : .subheadline)
+                            .lineSpacing(3)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if !card.tags.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(card.tags, id: \.self) { tag in
+                                        Text("#\(tag)")
+                                            .font(.caption)
+                                            .padding(.horizontal, 9).padding(.vertical, 4)
+                                            .background(Color.teal.opacity(0.1))
+                                            .foregroundStyle(.teal)
+                                            .clipShape(.rect(cornerRadius: 7))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            if let onDelete {
+                Button(role: .destructive, action: onDelete) {
+                    Label("Eliminar tarjeta", systemImage: "trash")
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Examen Simulado Tab (antigua FlashcardsTab)
+
+struct ExamenSimuladoTab: View {
     @ObservedObject var viewModel: StudyDetailViewModel
     let isLargeCanvas: Bool
 
@@ -299,9 +526,9 @@ struct FlashcardsTab: View {
     var body: some View {
         if viewModel.flashcards.isEmpty {
             ContentUnavailableView(
-                "Sin flashcards todavía",
-                systemImage: "rectangle.stack.badge.plus",
-                description: Text("Genera tarjetas con IA a partir de tus recursos o crea una manualmente.")
+                "Sin preguntas de examen todavía",
+                systemImage: "doc.questionmark.fill",
+                description: Text("Genera preguntas con IA para practicar como en un examen real. La IA evalúa tus respuestas.")
             )
             .overlay(alignment: .bottom) {
                 HStack(spacing: 12) {
@@ -440,133 +667,163 @@ struct ProgressTab: View {
             let totalAtt = allAttempts.count
             let correctAtt = allAttempts.filter(\.isCorrect).count
             let acc = totalAtt > 0 ? min(1, max(0, Double(correctAtt) / Double(totalAtt))) : 0.0
+            let ankiTotal = gaps.ankiTotalReviews
 
-            if totalAtt == 0 {
+            let hasExamData = totalAtt > 0
+            let hasAnkiData = ankiTotal > 0
+
+            if !hasExamData && !hasAnkiData {
                 ContentUnavailableView(
                     "Sin datos de práctica",
                     systemImage: "chart.bar.xaxis",
-                    description: Text("Practica algunas flashcards para ver tu progreso aquí.")
+                    description: Text("Practica flashcards o responde preguntas de examen para ver tu progreso aquí.")
                 )
             } else {
                 ScrollView {
                     VStack(spacing: 14) {
-                        // Accuracy card
-                        AeroSurfaceCard {
-                            HStack(spacing: 20) {
-                                ZStack {
-                                    Circle()
-                                        .stroke(Color.gray.opacity(0.15), lineWidth: 10)
-                                        .frame(width: 90, height: 90)
-                                    Circle()
-                                        .trim(from: 0, to: CGFloat(acc))
-                                        .stroke(
-                                            LinearGradient(colors: [.indigo, .teal],
-                                                           startPoint: .leading, endPoint: .trailing),
-                                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                                        )
-                                        .frame(width: 90, height: 90)
-                                        .rotationEffect(.degrees(-90))
-                                        .animation(.easeOut(duration: 0.8), value: acc)
-                                    Text("\(Int(acc * 100))%")
-                                        .font(.title3)
-                                        .fontWeight(.bold)
-                                }
 
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("Precisión general")
-                                        .font(isLargeCanvas ? .title3 : .headline)
-                                    StatRow(label: "Total intentos", value: "\(totalAtt)")
-                                    StatRow(label: "Aciertos", value: "\(correctAtt)", color: .green)
-                                    StatRow(label: "Errores", value: "\(totalAtt - correctAtt)", color: .red)
-                                    let reviewed = viewModel.flashcards.filter { !$0.attempts.isEmpty }.count
-                                    StatRow(label: "Tarjetas practicadas", value: "\(reviewed) / \(viewModel.flashcards.count)")
-                                }
-                                Spacer()
-                            }
-                        }
-
-                        if !gaps.errorTypeBreakdown.isEmpty {
-                            ProgressSectionHeader(title: "Errores por tipo",
-                                                  systemImage: "chart.bar.fill",
+                        // ── Sección Examen Simulado ──
+                        if hasExamData {
+                            ProgressSectionHeader(title: "Examen simulado",
+                                                  systemImage: "doc.questionmark.fill",
                                                   color: .indigo)
+
                             AeroSurfaceCard {
-                                VStack(spacing: 10) {
-                                    ForEach(gaps.errorTypeBreakdown, id: \.type.rawValue) { item in
-                                        let pct = totalAtt > 0 ? Double(item.count) / Double(totalAtt) : 0
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            HStack {
-                                                HStack(spacing: 6) {
-                                                    Image(systemName: errorTypeIcon(item.type))
-                                                        .font(.caption)
-                                                        .foregroundStyle(errorTypeColor(item.type))
-                                                    Text(errorTypeLabel(item.type))
-                                                        .font(.caption)
-                                                        .foregroundStyle(.primary)
-                                                }
-                                                Spacer()
-                                                Text("\(item.count) error\(item.count == 1 ? "" : "es") · \(Int(pct * 100))%")
-                                                    .font(.caption)
-                                                    .fontWeight(.semibold)
-                                                    .foregroundStyle(errorTypeColor(item.type))
-                                            }
-                                            ProgressView(value: pct)
-                                                .tint(errorTypeColor(item.type))
-                                        }
+                                HStack(spacing: 20) {
+                                    ZStack {
+                                        Circle()
+                                            .stroke(Color.gray.opacity(0.15), lineWidth: 10)
+                                            .frame(width: 90, height: 90)
+                                        Circle()
+                                            .trim(from: 0, to: CGFloat(acc))
+                                            .stroke(
+                                                LinearGradient(colors: [.indigo, .teal],
+                                                               startPoint: .leading, endPoint: .trailing),
+                                                style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                                            )
+                                            .frame(width: 90, height: 90)
+                                            .rotationEffect(.degrees(-90))
+                                            .animation(.easeOut(duration: 0.8), value: acc)
+                                        Text("\(Int(acc * 100))%")
+                                            .font(.title3)
+                                            .fontWeight(.bold)
                                     }
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text("Precisión general")
+                                            .font(isLargeCanvas ? .title3 : .headline)
+                                        StatRow(label: "Total intentos", value: "\(totalAtt)")
+                                        StatRow(label: "Aciertos", value: "\(correctAtt)", color: .green)
+                                        StatRow(label: "Errores", value: "\(totalAtt - correctAtt)", color: .red)
+                                        let reviewed = viewModel.flashcards.filter { !$0.attempts.isEmpty }.count
+                                        StatRow(label: "Tarjetas practicadas", value: "\(reviewed) / \(viewModel.flashcards.count)")
+                                    }
+                                    Spacer()
                                 }
                             }
-                        }
 
-                        if !gaps.gaps.isEmpty {
-                            ProgressSectionHeader(title: "Lagunas de conocimiento",
-                                                  systemImage: "exclamationmark.triangle.fill",
-                                                  color: .orange)
-                            ForEach(gaps.gaps) { gap in
-                                GapCardView(gap: gap, isLargeCanvas: isLargeCanvas)
-                            }
-
-                            // CTA prominente para generar desde lagunas
-                            Button {
-                                viewModel.showingGenerateFromGaps = true
-                            } label: {
+                            if !gaps.errorTypeBreakdown.isEmpty {
                                 AeroSurfaceCard {
-                                    HStack(spacing: 14) {
-                                        ZStack {
-                                            Circle()
-                                                .fill(LinearGradient(colors: [.orange, .red],
-                                                                     startPoint: .topLeading,
-                                                                     endPoint: .bottomTrailing))
-                                                .frame(width: 46, height: 46)
-                                            Image(systemName: "wand.and.stars")
-                                                .font(.title3)
-                                                .foregroundStyle(.white)
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Label("Errores por tipo", systemImage: "chart.bar.fill")
+                                            .font(.subheadline).fontWeight(.semibold)
+                                        Divider()
+                                        ForEach(gaps.errorTypeBreakdown, id: \.type.rawValue) { item in
+                                            let pct = totalAtt > 0 ? Double(item.count) / Double(totalAtt) : 0
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                HStack {
+                                                    HStack(spacing: 6) {
+                                                        Image(systemName: errorTypeIcon(item.type))
+                                                            .font(.caption)
+                                                            .foregroundStyle(errorTypeColor(item.type))
+                                                        Text(errorTypeLabel(item.type))
+                                                            .font(.caption)
+                                                            .foregroundStyle(.primary)
+                                                    }
+                                                    Spacer()
+                                                    Text("\(item.count) error\(item.count == 1 ? "" : "es") · \(Int(pct * 100))%")
+                                                        .font(.caption).fontWeight(.semibold)
+                                                        .foregroundStyle(errorTypeColor(item.type))
+                                                }
+                                                ProgressView(value: pct).tint(errorTypeColor(item.type))
+                                            }
                                         }
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            Text("Generar tarjetas de refuerzo")
-                                                .font(isLargeCanvas ? .subheadline : .callout)
-                                                .fontWeight(.semibold)
-                                                .foregroundStyle(.primary)
-                                            Text("La IA creará flashcards dirigidas a tus \(gaps.gaps.count) laguna\(gaps.gaps.count == 1 ? "" : "s") detectada\(gaps.gaps.count == 1 ? "" : "s")")
-                                                .font(.caption2)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption)
-                                            .foregroundStyle(.orange)
                                     }
                                 }
                             }
-                            .buttonStyle(.plain)
-                            .disabled(viewModel.resources.isEmpty)
+
+                            if !gaps.gaps.isEmpty {
+                                ProgressSectionHeader(title: "Lagunas (Examen)",
+                                                      systemImage: "exclamationmark.triangle.fill",
+                                                      color: .orange)
+                                ForEach(gaps.gaps) { gap in
+                                    GapCardView(gap: gap, isLargeCanvas: isLargeCanvas)
+                                }
+                                Button {
+                                    viewModel.showingGenerateFromGaps = true
+                                } label: {
+                                    AeroSurfaceCard {
+                                        HStack(spacing: 14) {
+                                            ZStack {
+                                                Circle()
+                                                    .fill(LinearGradient(colors: [.orange, .red],
+                                                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+                                                    .frame(width: 46, height: 46)
+                                                Image(systemName: "wand.and.stars").font(.title3).foregroundStyle(.white)
+                                            }
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text("Generar tarjetas de refuerzo")
+                                                    .font(isLargeCanvas ? .subheadline : .callout)
+                                                    .fontWeight(.semibold).foregroundStyle(.primary)
+                                                Text("La IA creará preguntas de examen sobre tus \(gaps.gaps.count) laguna\(gaps.gaps.count == 1 ? "" : "s")")
+                                                    .font(.caption2).foregroundStyle(.secondary)
+                                            }
+                                            Spacer()
+                                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.orange)
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(viewModel.resources.isEmpty)
+                            }
+
+                            if !gaps.strongConcepts.isEmpty {
+                                ProgressSectionHeader(title: "Conceptos dominados (Examen)",
+                                                      systemImage: "checkmark.seal.fill",
+                                                      color: .green)
+                                ForEach(gaps.strongConcepts) { concept in
+                                    StrongConceptCardView(concept: concept)
+                                }
+                            }
                         }
 
-                        if !gaps.strongConcepts.isEmpty {
-                            ProgressSectionHeader(title: "Conceptos dominados",
-                                                  systemImage: "checkmark.seal.fill",
-                                                  color: .green)
-                            ForEach(gaps.strongConcepts) { concept in
-                                StrongConceptCardView(concept: concept)
+                        // ── Sección Flashcards Anki ──
+                        if hasAnkiData {
+                            ProgressSectionHeader(title: "Flashcards (Anki)",
+                                                  systemImage: "rectangle.on.rectangle.angled",
+                                                  color: .teal)
+
+                            AnkiProgressSummaryCard(
+                                ankiCards: viewModel.ankiCards,
+                                totalReviews: ankiTotal,
+                                isLargeCanvas: isLargeCanvas
+                            )
+
+                            if !gaps.ankiGaps.isEmpty {
+                                ProgressSectionHeader(title: "Conceptos difíciles (Anki)",
+                                                      systemImage: "brain.head.profile",
+                                                      color: .red)
+                                ForEach(gaps.ankiGaps) { gap in
+                                    AnkiGapCardView(gap: gap, isLargeCanvas: isLargeCanvas)
+                                }
+                            }
+
+                            if !gaps.ankiStrongConcepts.isEmpty {
+                                ProgressSectionHeader(title: "Conceptos dominados",
+                                                      systemImage: "star.fill",
+                                                      color: .teal)
+                                ForEach(gaps.ankiStrongConcepts) { concept in
+                                    StrongConceptCardView(concept: concept)
+                                }
                             }
                         }
                     }
@@ -624,6 +881,159 @@ struct StatRow: View {
             Spacer()
             Text(value).font(.caption).fontWeight(.semibold).foregroundColor(color)
         }
+    }
+}
+
+// MARK: - Anki Progress Views
+
+struct AnkiProgressSummaryCard: View {
+    let ankiCards: [SDAnkiCard]
+    let totalReviews: Int
+    let isLargeCanvas: Bool
+
+    private var reviewedCards: Int { ankiCards.filter { !$0.ratingHistory.isEmpty }.count }
+    private var strugglingCards: Int { ankiCards.filter { $0.isStruggling }.count }
+    /// Dominadas: mínimo 5 repasos y tasa de olvido <= 20%
+    private var dominatedCards: Int { ankiCards.filter { $0.ratingHistory.count >= 5 && $0.ankiErrorRate <= 0.2 }.count }
+    private var totalFailures: Int { ankiCards.reduce(0) { $0 + $1.ratingHistory.filter { $0 < 3 }.count } }
+    private var accuracy: Double {
+        totalReviews > 0 ? Double(totalReviews - totalFailures) / Double(totalReviews) : 0
+    }
+
+    var body: some View {
+        AeroSurfaceCard {
+            HStack(spacing: 20) {
+                ZStack {
+                    Circle()
+                        .stroke(Color.gray.opacity(0.15), lineWidth: 10)
+                        .frame(width: 90, height: 90)
+                    Circle()
+                        .trim(from: 0, to: CGFloat(accuracy))
+                        .stroke(
+                            LinearGradient(colors: [.teal, .indigo], startPoint: .leading, endPoint: .trailing),
+                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                        )
+                        .frame(width: 90, height: 90)
+                        .rotationEffect(.degrees(-90))
+                        .animation(.easeOut(duration: 0.8), value: accuracy)
+                    Text("\(Int(accuracy * 100))%")
+                        .font(.title3).fontWeight(.bold)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Retención Anki")
+                        .font(isLargeCanvas ? .title3 : .headline)
+                    StatRow(label: "Total repasos", value: "\(totalReviews)")
+                    StatRow(label: "Recordadas", value: "\(totalReviews - totalFailures)", color: .green)
+                    StatRow(label: "Olvidadas", value: "\(totalFailures)", color: .red)
+                    StatRow(label: "Tarjetas revisadas", value: "\(reviewedCards) / \(ankiCards.count)")
+                }
+                Spacer()
+            }
+
+            if strugglingCards > 0 || dominatedCards > 0 {
+                Divider().padding(.top, 8)
+                HStack(spacing: 16) {
+                    if strugglingCards > 0 {
+                        Label("\(strugglingCards) difíciles", systemImage: "exclamationmark.circle.fill")
+                            .font(.caption).fontWeight(.semibold).foregroundStyle(.red)
+                    }
+                    if dominatedCards > 0 {
+                        Label("\(dominatedCards) dominadas", systemImage: "checkmark.circle.fill")
+                            .font(.caption).fontWeight(.semibold).foregroundStyle(.teal)
+                    }
+                    Spacer()
+                }
+                .padding(.top, 8)
+            }
+        }
+    }
+}
+
+struct AnkiGapCardView: View {
+    let gap: ConceptGap
+    let isLargeCanvas: Bool
+    @State private var isExpanded = false
+
+    private var severityColor: Color {
+        gap.error_rate >= 0.7 ? .red : gap.error_rate >= 0.5 ? .orange : Color(red: 0.9, green: 0.6, blue: 0)
+    }
+    private var severityLabel: String {
+        gap.error_rate >= 0.7 ? "Muy difícil" : gap.error_rate >= 0.5 ? "Difícil" : "Moderado"
+    }
+
+    var body: some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) { isExpanded.toggle() }
+        } label: {
+            AeroSurfaceCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            Circle().fill(severityColor.opacity(0.12)).frame(width: 50, height: 50)
+                            Text("\(Int(gap.error_rate * 100))%")
+                                .font(.subheadline).fontWeight(.bold).foregroundStyle(severityColor)
+                        }
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text(gap.concept.capitalized)
+                                    .font(isLargeCanvas ? .subheadline : .callout).fontWeight(.semibold)
+                                Text(severityLabel)
+                                    .font(.caption2).fontWeight(.bold)
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(severityColor.opacity(0.1)).foregroundStyle(severityColor)
+                                    .clipShape(Capsule())
+                            }
+                            Text("\(gap.errors) veces olvidado de \(gap.total_attempts) repasos")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.caption).fontWeight(.semibold).foregroundStyle(.secondary)
+                    }
+
+                    if isExpanded {
+                        Divider()
+                        VStack(alignment: .leading, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("Tasa de olvido").font(.caption2).foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text("\(Int(gap.error_rate * 100))%").font(.caption2).fontWeight(.semibold).foregroundStyle(severityColor)
+                                }
+                                ProgressView(value: gap.error_rate).tint(severityColor)
+                            }
+
+                            HStack(spacing: 6) {
+                                Label("\(gap.total_attempts - gap.errors) recordadas", systemImage: "checkmark.circle.fill")
+                                    .font(.caption2).foregroundStyle(.teal)
+                                Spacer()
+                                Label("\(gap.errors) olvidadas", systemImage: "xmark.circle.fill")
+                                    .font(.caption2).foregroundStyle(.red)
+                            }
+
+                            GeometryReader { geo in
+                                HStack(spacing: 2) {
+                                    Rectangle()
+                                        .fill(Color.teal.opacity(0.7))
+                                        .frame(width: geo.size.width * CGFloat(1 - gap.error_rate), height: 6)
+                                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                                    Rectangle()
+                                        .fill(Color.red.opacity(0.7))
+                                        .frame(width: geo.size.width * CGFloat(gap.error_rate), height: 6)
+                                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                                }
+                            }
+                            .frame(height: 6)
+
+                            Text("Consejo: repasa este concepto con mayor frecuencia. Aparecerá antes en tu cola Anki.")
+                                .font(.caption2).foregroundStyle(.secondary)
+                                .italic()
+                        }
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -1262,6 +1672,6 @@ struct CreateFlashcardManualView: View {
     return NavigationStack {
         StudyDetailView(study: study)
     }
-    .modelContainer(for: [SDStudy.self, SDResource.self, SDFlashcard.self, SDAttempt.self], inMemory: true)
+    .modelContainer(for: [SDStudy.self, SDStudyBoard.self, SDResource.self, SDFlashcard.self, SDAttempt.self, SDAnkiCard.self], inMemory: true)
 }
 #endif

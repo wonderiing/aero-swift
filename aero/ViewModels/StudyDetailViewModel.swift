@@ -8,6 +8,8 @@ final class StudyDetailViewModel: ObservableObject {
     @Published var resources: [SDResource] = []
     @Published var flashcards: [SDFlashcard] = []
     @Published var reviewQueue: [SDFlashcard] = []
+    @Published var ankiCards: [SDAnkiCard] = []
+    @Published var ankiReviewQueue: [SDAnkiCard] = []
     @Published var gapAnalysis: GapAnalysis?
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -16,6 +18,7 @@ final class StudyDetailViewModel: ObservableObject {
     @Published var showingGenerateFlashcards = false
     @Published var showingCreateFlashcardManual = false
     @Published var showingGenerateFromGaps = false
+    @Published var showingGenerateAnkiCards = false
     @Published var resourceTitle = ""
     @Published var resourceContent = ""
     @Published var resourceSourceName: String?
@@ -31,7 +34,10 @@ final class StudyDetailViewModel: ObservableObject {
         flashcards = study.flashcards.sorted { ($0.createdAt) > ($1.createdAt) }
         reviewQueue = study.flashcards.filter { $0.nextReviewAt <= Date() }
             .sorted { $0.nextReviewAt < $1.nextReviewAt }
-        gapAnalysis = GapAnalysis.compute(flashcards: study.flashcards)
+        ankiCards = study.ankiCards.sorted { ($0.createdAt) > ($1.createdAt) }
+        ankiReviewQueue = study.ankiCards.filter { $0.nextReviewAt <= Date() }
+            .sorted { $0.nextReviewAt < $1.nextReviewAt }
+        gapAnalysis = GapAnalysis.compute(flashcards: study.flashcards, ankiCards: study.ankiCards)
     }
 
     func createResource() {
@@ -136,6 +142,52 @@ final class StudyDetailViewModel: ObservableObject {
             fetchContent()
         } catch {
             errorMessage = "Error al guardar flashcards: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Anki Cards
+
+    func saveAnkiCardBatch(_ cards: [EditableAnkiCard]) {
+        guard let ctx = modelContext else { return }
+        let resourceMap = Dictionary(uniqueKeysWithValues: study.resources.map { ($0.id, $0) })
+        for card in cards {
+            let anki = SDAnkiCard(
+                front: card.front,
+                back: card.back,
+                tags: card.tags,
+                study: study,
+                resource: resourceMap[card.resourceId]
+            )
+            ctx.insert(anki)
+        }
+        do {
+            try ctx.save()
+            fetchContent()
+        } catch {
+            errorMessage = "Error al guardar flashcards: \(error.localizedDescription)"
+        }
+    }
+
+    func deleteAnkiCard(id: UUID) {
+        guard let ctx = modelContext,
+              let card = study.ankiCards.first(where: { $0.id == id }) else { return }
+        ctx.delete(card)
+        do {
+            try ctx.save()
+            fetchContent()
+        } catch {
+            errorMessage = "Error al eliminar flashcard: \(error.localizedDescription)"
+        }
+    }
+
+    func updateAnkiSM2(card: SDAnkiCard, quality: Int) {
+        guard let ctx = modelContext else { return }
+        card.updateSM2(quality: quality)
+        do {
+            try ctx.save()
+            fetchContent()
+        } catch {
+            errorMessage = "Error al actualizar repaso: \(error.localizedDescription)"
         }
     }
 

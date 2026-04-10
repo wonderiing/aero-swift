@@ -77,6 +77,43 @@ struct GeneratedAnswerEvaluation {
     var confidenceScore: Double
 }
 
+// MARK: - Anki Cards
+
+@Generable(description: "Lote de tarjetas Anki estilo memoria (frente/dorso) basadas en el material de estudio")
+struct GeneratedAnkiPack {
+    @Guide(description: "Lista de tarjetas Anki generadas", .minimumCount(2), .maximumCount(30))
+    var cards: [GeneratedAnkiItem]
+}
+
+@Generable(description: "Lote pequeño de tarjetas Anki de un fragmento de material")
+struct GeneratedAnkiChunk {
+    @Guide(description: "Tarjetas Anki de este fragmento", .minimumCount(1), .maximumCount(8))
+    var cards: [GeneratedAnkiItem]
+}
+
+@Generable
+struct GeneratedAnkiItem {
+    @Guide(description: """
+    Frente de la tarjeta (pregunta o término): máximo 12 palabras, inequívoco, atómico (un solo concepto).
+    Varía el formato: definición inversa, mecanismo, causa-efecto, clasificación, comparación, o cloze implícito.
+    El estudiante debe poder decir en segundos si sabe o no sabe la respuesta.
+    """)
+    var front: String
+
+    @Guide(description: """
+    Dorso de la tarjeta (respuesta): empieza con la respuesta directa en 1 frase (15-35 palabras).
+    Si el concepto es abstracto, añade una segunda frase con un ejemplo concreto o analogía del material.
+    NUNCA repitas la pregunta. NUNCA más de 2 frases.
+    """)
+    var back: String
+
+    @Guide(description: "1 a 3 etiquetas conceptuales precisas que identifican el tema de esta tarjeta", .minimumCount(1), .maximumCount(3))
+    var tags: [String]
+
+    @Guide(description: "Copia exacta del título del recurso de origen tal como aparece en la lista RECURSOS")
+    var sourceResourceTitle: String
+}
+
 // MARK: - Ampliar explicación
 
 @Generable(description: "Explicación ampliada para el estudiante")

@@ -374,7 +374,7 @@ struct CreateStudyView: View {
 
 #Preview("Lista estudios") {
     StudyListView()
-        .modelContainer(for: [SDStudy.self, SDResource.self, SDFlashcard.self, SDAttempt.self], inMemory: true)
+        .modelContainer(for: [SDStudy.self, SDStudyBoard.self, SDResource.self, SDFlashcard.self, SDAttempt.self], inMemory: true)
 }
 
 #Preview("Banner stats") {

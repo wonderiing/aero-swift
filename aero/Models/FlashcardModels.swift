@@ -40,6 +40,16 @@ struct CreateFlashcardDto: Codable, Sendable {
     var options: FlashcardOptions?
 }
 
+/// Editable wrapper for Anki cards before saving
+struct EditableAnkiCard: Identifiable {
+    let id = UUID()
+    var resourceId: UUID
+    var front: String
+    var back: String
+    var tags: [String]
+    var isIncluded: Bool = true
+}
+
 /// Editable wrapper used during the review-before-save flow
 struct EditableFlashcard: Identifiable {
     let id = UUID()

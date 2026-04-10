@@ -488,16 +488,16 @@ struct GenerateFlashcardsSheet: View {
                 .scrollContentBackground(.hidden)
                 .frame(maxWidth: maxContentWidth)
                 .frame(maxWidth: .infinity, alignment: .center)
-                .overlay {
-                    if viewModel.resources.isEmpty {
-                        ContentUnavailableView(
-                            "Sin recursos",
-                            systemImage: "doc.text.magnifyingglass",
-                            description: Text("Añade al menos un recurso con texto para generar flashcards.")
-                        )
-                        .padding(.horizontal, 24)
+                    .overlay {
+                        if viewModel.resources.isEmpty {
+                            ContentUnavailableView(
+                                "Sin recursos",
+                                systemImage: "doc.text.magnifyingglass",
+                                description: Text("Añade al menos un recurso con texto para generar el examen.")
+                            )
+                            .padding(.horizontal, 24)
+                        }
                     }
-                }
                 .safeAreaInset(edge: .bottom) {
                     // Bottom primary action (modern “sticky” CTA)
                     VStack(spacing: 10) {
@@ -507,7 +507,7 @@ struct GenerateFlashcardsSheet: View {
                             HStack(spacing: 10) {
                                 Image(systemName: canGenerate ? "sparkles" : "sparkles.slash")
                                     .symbolRenderingMode(.hierarchical)
-                                Text(isGenerating ? "Generando…" : "Generar flashcards")
+                                Text(isGenerating ? "Generando…" : "Generar examen simulado")
                                     .fontWeight(.semibold)
                                 Spacer()
                                 Text(depth == .low ? "~6" : (depth == .medium ? "~12" : "~18"))
@@ -551,7 +551,7 @@ struct GenerateFlashcardsSheet: View {
                     .transition(.scale(scale: 0.85).combined(with: .opacity))
                 }
             }
-            .navigationTitle("Generar flashcards")
+            .navigationTitle("Generar examen simulado")
             .navigationBarTitleDisplayMode(isLargeCanvas ? .automatic : .inline)
             .onAppear { IntelligentStudyAssistant.prewarm() }
             .toolbar {
@@ -806,6 +806,427 @@ private struct FlashcardEditorFields: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Generate Anki Cards Sheet
+
+struct GenerateAnkiCardsSheet: View {
+    @ObservedObject var viewModel: StudyDetailViewModel
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    @State private var selectedIds: Set<UUID> = []
+    @State private var depth: IntelligentStudyAssistant.Depth = .medium
+    @State private var drafts: [EditableAnkiCard] = []
+    @State private var navigateReview = false
+    @State private var isGenerating = false
+    @State private var generationError: String?
+    @State private var generationProgress: CGFloat = 0
+    @State private var generationStatus: String = "Preparando..."
+
+    private var canGenerate: Bool {
+        let aiOk = IntelligentStudyAssistant.isAppleIntelligenceReady
+            || IntelligentStudyAssistant.unavailabilityReason == .modelNotReady
+        return aiOk && !selectedIds.isEmpty && !isGenerating
+    }
+
+    private var isLargeCanvas: Bool {
+        #if os(macOS)
+        return true
+        #else
+        return UIDevice.current.userInterfaceIdiom == .pad || horizontalSizeClass == .regular
+        #endif
+    }
+
+    private var typeScale: AeroTypeScale { .make(isLargeCanvas: isLargeCanvas) }
+    private var maxContentWidth: CGFloat { isLargeCanvas ? AeroLayout.maxContentWidthRegular : AeroLayout.maxContentWidthCompact }
+    private var resourcePreviewLength: Int { isLargeCanvas ? 200 : 120 }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                AeroBackground()
+
+                List {
+                    Section {
+                        AeroCard(isLargeCanvas: isLargeCanvas) {
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: "rectangle.on.rectangle.angled")
+                                    .font(typeScale.sectionHeader)
+                                    .foregroundStyle(LinearGradient(colors: [.teal, .indigo], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Flashcards estilo Anki")
+                                        .font(typeScale.sectionHeader)
+                                    Text("Tarjetas simples frente/dorso para memorización con repetición espaciada.")
+                                        .font(typeScale.secondary)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                        .listRowBackground(Color.clear)
+
+                        AeroCard(isLargeCanvas: isLargeCanvas) {
+                            if IntelligentStudyAssistant.isAppleIntelligenceReady {
+                                HStack(alignment: .center, spacing: 12) {
+                                    Image(systemName: "apple.intelligence")
+                                        .font(typeScale.sectionHeader)
+                                        .foregroundStyle(LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Apple Intelligence activa")
+                                            .font(typeScale.sectionHeader)
+                                        Text("Generación on-device privada.")
+                                            .font(typeScale.secondary)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer(minLength: 8)
+                                    Text("OK")
+                                        .font(typeScale.pill)
+                                        .padding(.horizontal, 10).padding(.vertical, 6)
+                                        .background(Color.green.opacity(0.14), in: Capsule())
+                                        .foregroundStyle(.green)
+                                }
+                            } else {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    let reason = IntelligentStudyAssistant.unavailabilityReason
+                                    if reason == .modelNotReady {
+                                        Label("Modelo descargándose…", systemImage: "arrow.down.circle")
+                                            .font(typeScale.sectionHeader).foregroundStyle(.orange)
+                                        Text("Espera a que termine la descarga del modelo.")
+                                            .font(typeScale.secondary).foregroundStyle(.secondary)
+                                    } else {
+                                        Label("Apple Intelligence no disponible", systemImage: "exclamationmark.triangle.fill")
+                                            .font(typeScale.sectionHeader).foregroundStyle(.red)
+                                        Text(IntelligentStudyAssistant.unavailabilityReasonDescription())
+                                            .font(typeScale.secondary).foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                        .listRowBackground(Color.clear)
+                    } header: {
+                        SectionHeader("Tipo y motor", systemImage: "cpu", typeScale: typeScale) { EmptyView() }
+                    }
+
+                    Section {
+                        AeroCard(isLargeCanvas: isLargeCanvas) {
+                            HStack(alignment: .center, spacing: 12) {
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(typeScale.sectionHeader).foregroundStyle(.secondary)
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Cantidad orientativa")
+                                        .font(typeScale.sectionHeader)
+                                    Picker("Cantidad", selection: $depth) {
+                                        Text("Pocas").tag(IntelligentStudyAssistant.Depth.low)
+                                        Text("Media").tag(IntelligentStudyAssistant.Depth.medium)
+                                        Text("Muchas").tag(IntelligentStudyAssistant.Depth.high)
+                                    }
+                                    .pickerStyle(.segmented)
+                                    .controlSize(isLargeCanvas ? .large : .regular)
+                                }
+                            }
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                    } header: {
+                        SectionHeader("Ajustes", systemImage: "gearshape", typeScale: typeScale) { EmptyView() }
+                    } footer: {
+                        Text(depth == .low ? "~6 tarjetas, repaso rápido." : depth == .medium ? "~12 tarjetas, sesión equilibrada." : "~18 tarjetas, cobertura completa.")
+                            .font(typeScale.secondary)
+                    }
+
+                    Section {
+                        ForEach(viewModel.resources) { r in
+                            ResourceSelectionRow(
+                                title: r.title,
+                                preview: String(r.content.prefix(resourcePreviewLength)) + (r.content.count > resourcePreviewLength ? "…" : ""),
+                                isSelected: Binding(
+                                    get: { selectedIds.contains(r.id) },
+                                    set: { on in
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                            if on { selectedIds.insert(r.id) } else { selectedIds.remove(r.id) }
+                                        }
+                                    }
+                                ),
+                                typeScale: typeScale,
+                                isLargeCanvas: isLargeCanvas
+                            )
+                            .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                        }
+                    } header: {
+                        SectionHeader("Recursos", systemImage: "books.vertical", typeScale: typeScale) {
+                            CountPill(count: selectedIds.count, typeScale: typeScale)
+                        }
+                    } footer: {
+                        Text("La IA extraerá los conceptos clave y creará tarjetas atómicas frente/dorso.")
+                            .font(typeScale.secondary)
+                    }
+
+                    if let generationError {
+                        Section {
+                            AeroCard(isLargeCanvas: isLargeCanvas) {
+                                HStack(alignment: .top, spacing: 12) {
+                                    Image(systemName: "xmark.octagon.fill").foregroundStyle(.red).font(typeScale.sectionHeader)
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text("No se pudo generar").font(typeScale.sectionHeader)
+                                        Text(generationError).font(typeScale.secondary).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                }
+                            }
+                            .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                        }
+                    }
+                }
+                .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
+                .frame(maxWidth: maxContentWidth)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .overlay {
+                    if viewModel.resources.isEmpty {
+                        ContentUnavailableView(
+                            "Sin recursos",
+                            systemImage: "doc.text.magnifyingglass",
+                            description: Text("Añade al menos un recurso con texto para generar flashcards.")
+                        )
+                        .padding(.horizontal, 24)
+                    }
+                }
+                .safeAreaInset(edge: .bottom) {
+                    VStack(spacing: 10) {
+                        Button {
+                            Task { await runAnkiGeneration() }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: canGenerate ? "rectangle.on.rectangle.angled" : "sparkles.slash")
+                                    .symbolRenderingMode(.hierarchical)
+                                Text(isGenerating ? "Generando…" : "Generar flashcards")
+                                    .fontWeight(.semibold)
+                                Spacer()
+                                Text(depth == .low ? "~6" : depth == .medium ? "~12" : "~18")
+                                    .font(typeScale.secondary).foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(canGenerate
+                                          ? AnyShapeStyle(LinearGradient(colors: [.teal, .indigo], startPoint: .leading, endPoint: .trailing))
+                                          : AnyShapeStyle(Color.gray.opacity(0.25)))
+                            )
+                            .foregroundStyle(canGenerate ? .white : .secondary)
+                            .shadow(color: canGenerate ? .teal.opacity(0.25) : .clear, radius: 16, y: 8)
+                        }
+                        .disabled(!canGenerate)
+                        .controlSize(isLargeCanvas ? .large : .regular)
+                    }
+                    .padding(.horizontal, isLargeCanvas ? 24 : 16)
+                    .padding(.top, 10).padding(.bottom, 10)
+                    .background(.ultraThinMaterial)
+                    .frame(maxWidth: maxContentWidth)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
+                .allowsHitTesting(!isGenerating)
+                .blur(radius: isGenerating ? 4 : 0)
+
+                if isGenerating {
+                    Color.black.opacity(0.15).ignoresSafeArea().transition(.opacity)
+                    GenerationProgressOverlay(progress: generationProgress, statusText: generationStatus, typeScale: typeScale)
+                        .transition(.scale(scale: 0.85).combined(with: .opacity))
+                }
+            }
+            .navigationTitle("Generar flashcards")
+            .navigationBarTitleDisplayMode(isLargeCanvas ? .automatic : .inline)
+            .onAppear { IntelligentStudyAssistant.prewarm() }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cerrar") { dismiss() }.disabled(isGenerating)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button { Task { await runAnkiGeneration() } } label: {
+                        Label("Generar", systemImage: "rectangle.on.rectangle.angled")
+                    }
+                    .disabled(!canGenerate)
+                }
+            }
+            .navigationDestination(isPresented: $navigateReview) {
+                ReviewGeneratedAnkiView(
+                    viewModel: viewModel,
+                    drafts: $drafts,
+                    onFinish: { navigateReview = false; dismiss() }
+                )
+            }
+        }
+    }
+
+    private func runAnkiGeneration() async {
+        isGenerating = true
+        generationError = nil
+        generationProgress = 0.05
+        generationStatus = "Analizando material..."
+
+        let selected = viewModel.resources.filter { selectedIds.contains($0.id) }
+        let payload = selected.map { (id: $0.id, title: $0.title, content: $0.content) }
+
+        do {
+            let result = try await IntelligentStudyAssistant.generateAnkiCardsFromResources(
+                resources: payload,
+                depth: depth,
+                onProgress: { progress in
+                    Task { @MainActor in
+                        let total = max(1, progress.totalChunks)
+                        generationProgress = CGFloat(0.05 + 0.85 * (Double(progress.completedChunks) / Double(total)))
+                        if progress.completedChunks == 0 {
+                            generationStatus = total > 1 ? "Generando parte 1 de \(total)..." : "Generando flashcards..."
+                        } else if progress.completedChunks < total {
+                            generationStatus = "Generando parte \(progress.completedChunks + 1) de \(total)..."
+                        } else {
+                            generationStatus = "Finalizando..."
+                        }
+                    }
+                }
+            )
+            generationProgress = 1.0
+            generationStatus = "¡Listo!"
+            try? await Task.sleep(for: .milliseconds(500))
+            drafts = result
+            isGenerating = false
+            if result.isEmpty {
+                generationError = "No se generó ninguna tarjeta. Añade más texto al recurso."
+            } else {
+                navigateReview = true
+            }
+        } catch {
+            generationError = error.localizedDescription
+            isGenerating = false
+        }
+    }
+}
+
+// MARK: - Review Generated Anki Cards
+
+struct ReviewGeneratedAnkiView: View {
+    @ObservedObject var viewModel: StudyDetailViewModel
+    @Binding var drafts: [EditableAnkiCard]
+    var onFinish: () -> Void
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private var isLargeCanvas: Bool {
+        #if os(macOS)
+        return true
+        #else
+        return UIDevice.current.userInterfaceIdiom == .pad || horizontalSizeClass == .regular
+        #endif
+    }
+    private var typeScale: AeroTypeScale { .make(isLargeCanvas: isLargeCanvas) }
+    private var maxContentWidth: CGFloat { isLargeCanvas ? AeroLayout.maxContentWidthRegular : AeroLayout.maxContentWidthCompact }
+
+    var body: some View {
+        ZStack {
+            AeroBackground()
+
+            List {
+                if let errorMessage {
+                    Section {
+                        AeroCard(isLargeCanvas: isLargeCanvas) {
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.red).font(typeScale.sectionHeader).accessibilityHidden(true)
+                                Text(errorMessage).font(typeScale.secondary).foregroundStyle(.secondary)
+                                Spacer()
+                            }
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                        .listRowBackground(Color.clear).listRowSeparator(.hidden)
+                    }
+                }
+
+                ForEach($drafts) { $card in
+                    Section {
+                        AeroCard(isLargeCanvas: isLargeCanvas) {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "rectangle.on.rectangle.angled")
+                                        .foregroundStyle(LinearGradient(colors: [.teal, .indigo], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                        .symbolRenderingMode(.hierarchical).accessibilityHidden(true)
+                                    Text("Flashcard Anki").font(typeScale.sectionHeader)
+                                    Spacer()
+                                    Toggle("Incluir", isOn: $card.isIncluded)
+                                        .labelsHidden().tint(.teal)
+                                        .controlSize(isLargeCanvas ? .large : .regular)
+                                }
+
+                                if isLargeCanvas {
+                                    HStack(alignment: .top, spacing: 12) {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Text("Frente").font(typeScale.editorLabel).foregroundStyle(.secondary)
+                                            TextField("Frente", text: $card.front, axis: .vertical).textFieldStyle(.roundedBorder)
+                                        }
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Text("Dorso").font(typeScale.editorLabel).foregroundStyle(.secondary)
+                                            TextField("Dorso", text: $card.back, axis: .vertical).textFieldStyle(.roundedBorder)
+                                            TextField("Tags (coma)", text: Binding(
+                                                get: { card.tags.joined(separator: ", ") },
+                                                set: { card.tags = $0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } }
+                                            )).textFieldStyle(.roundedBorder)
+                                        }
+                                    }
+                                } else {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("Frente").font(typeScale.editorLabel).foregroundStyle(.secondary)
+                                        TextField("Frente", text: $card.front, axis: .vertical).textFieldStyle(.roundedBorder)
+                                        Text("Dorso").font(typeScale.editorLabel).foregroundStyle(.secondary)
+                                        TextField("Dorso", text: $card.back, axis: .vertical).textFieldStyle(.roundedBorder)
+                                        TextField("Tags (coma)", text: Binding(
+                                            get: { card.tags.joined(separator: ", ") },
+                                            set: { card.tags = $0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } }
+                                        )).textFieldStyle(.roundedBorder)
+                                    }
+                                }
+                            }
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                        .listRowBackground(Color.clear).listRowSeparator(.hidden)
+                    }
+                }
+                .onDelete { drafts.remove(atOffsets: $0) }
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .frame(maxWidth: maxContentWidth)
+            .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .navigationTitle("Revisar y guardar")
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Guardar todas") { saveBatch() }
+                    .disabled(isSaving)
+                    .controlSize(isLargeCanvas ? .large : .regular)
+            }
+        }
+    }
+
+    private func saveBatch() {
+        isSaving = true
+        errorMessage = nil
+        let included = drafts.filter(\.isIncluded)
+        guard !included.isEmpty else {
+            errorMessage = "Incluye al menos una tarjeta."
+            isSaving = false
+            return
+        }
+        viewModel.saveAnkiCardBatch(included)
+        isSaving = false
+        onFinish()
     }
 }
 

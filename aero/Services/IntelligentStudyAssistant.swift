@@ -334,6 +334,162 @@ enum IntelligentStudyAssistant {
         return results
     }
 
+    // MARK: - Generación de tarjetas Anki
+
+    static func generateAnkiCardsFromResources(
+        resources: [(id: UUID, title: String, content: String)],
+        depth: Depth,
+        onProgress: (@Sendable (GenerationProgress) -> Void)? = nil
+    ) async throws -> [EditableAnkiCard] {
+        if !isAppleIntelligenceReady {
+            fmLog("generateAnki", "⏳ Modelo no listo, esperando hasta 10s...")
+            let ready = await waitForModelReadiness(timeout: 10)
+            if !ready { throw StudyAIError.modelUnavailable(unavailabilityReasonDescription()) }
+        }
+
+        let target = depth.approximateCardCount
+        let titleToId = Dictionary(uniqueKeysWithValues: resources.map { ($0.title, $0.id) })
+        let maxCharsPerChunk = 1_500
+        let chunks = buildMaterialChunks(resources: resources, maxCharsPerChunk: maxCharsPerChunk)
+        let cardsPerChunk = max(2, target / max(1, chunks.count))
+
+        fmLog("generateAnki", "→ depth=\(depth.rawValue) target=\(target) chunks=\(chunks.count)")
+
+        var allCards: [EditableAnkiCard] = []
+        var firstError: Error?
+
+        for (idx, chunk) in chunks.enumerated() {
+            onProgress?(GenerationProgress(completedChunks: idx, totalChunks: chunks.count))
+            let cardsForChunk = (idx == chunks.count - 1) ? max(2, target - allCards.count) : cardsPerChunk
+            do {
+                let cards = try await generateAnkiChunk(
+                    chunk: chunk,
+                    cardsTarget: cardsForChunk,
+                    titleToId: titleToId,
+                    fallbackResourceId: resources.first?.id,
+                    chunkIndex: idx,
+                    totalChunks: chunks.count
+                )
+                allCards.append(contentsOf: cards)
+                fmLog("generateAnki", "  chunk \(idx+1)/\(chunks.count) → \(cards.count) tarjetas (acumulado: \(allCards.count))")
+            } catch {
+                fmLog("generateAnki", "  ⚠️ chunk \(idx+1) falló: \(error.localizedDescription)")
+                if firstError == nil { firstError = error }
+            }
+        }
+
+        onProgress?(GenerationProgress(completedChunks: chunks.count, totalChunks: chunks.count))
+        if allCards.isEmpty, let err = firstError { throw err }
+        fmLog("generateAnki", "✅ Total: \(allCards.count) tarjetas Anki")
+        return allCards
+    }
+
+    private static func generateAnkiChunk(
+        chunk: MaterialChunk,
+        cardsTarget: Int,
+        titleToId: [String: UUID],
+        fallbackResourceId: UUID?,
+        chunkIndex: Int,
+        totalChunks: Int
+    ) async throws -> [EditableAnkiCard] {
+        let instructions = Instructions {
+            "Eres un experto en aprendizaje espaciado estilo Anki con dominio en didáctica y ciencias cognitivas."
+            "PRINCIPIO FUNDAMENTAL: cada tarjeta debe pasar el 'test del buen Anki': el estudiante debe poder decir en <1 segundo si sabe o no sabe la respuesta al leer el frente."
+            ""
+            "REGLAS DEL FRENTE (pregunta/término):"
+            "1. ATOMICIDAD: cubre exactamente UN concepto o hecho. Nunca 'A y B'."
+            "2. CLARIDAD: máximo 12 palabras. La pregunta es inequívoca — solo hay una respuesta correcta posible."
+            "3. VARIEDAD DE FORMATOS — rota entre estos estilos:"
+            "   • Definición inversa: '¿Qué es [término]?' (solo si el término es técnico fundamental)"
+            "   • Mecanismo: '¿Cómo [proceso] produce [resultado]?'"
+            "   • Causa-efecto: '¿Qué provoca [fenómeno]?'"
+            "   • Clasificación: '¿A qué categoría pertenece [concepto]?'"
+            "   • Cloze implícito: '[Enunciado con espacio en blanco implícito]' → el dorso completa"
+            "   • Comparación: '¿En qué se diferencia [A] de [B]?' (una diferencia clave)"
+            "4. NUNCA preguntas ambiguas que admitan múltiples respuestas válidas."
+            ""
+            "REGLAS DEL DORSO (respuesta):"
+            "1. RESPUESTA DIRECTA primero: la información que el estudiante necesita recordar, en 1 frase."
+            "2. CONTEXTO MÍNIMO: si el concepto es abstracto, añade una segunda frase con un ejemplo concreto o analogía breve del propio material."
+            "3. FÓRMULA OPCIONAL: si aplica (ciencias, matemáticas), incluye la fórmula o estructura clave."
+            "4. NUNCA repitas la pregunta en la respuesta. NUNCA añadas explicaciones largas."
+            "5. Longitud ideal: 15-40 palabras."
+            ""
+            "PRIORIZACIÓN DEL CONTENIDO:"
+            "— Definiciones de términos técnicos centrales"
+            "— Mecanismos o procesos explicados en el texto"
+            "— Relaciones causales importantes"
+            "— Números, fechas o datos cuantitativos significativos"
+            "— NUNCA: datos triviales, ejemplos decorativos, información periférica"
+            ""
+            "sourceResourceTitle debe ser copia exacta del título del recurso en la lista RECURSOS."
+        }
+
+        let session = LanguageModelSession(instructions: instructions)
+
+        let prompt: String
+        if totalChunks == 1 {
+            prompt = """
+            RECURSOS:
+            \(chunk.resourceList)
+
+            Genera \(cardsTarget) tarjetas Anki (frente/dorso) a partir del siguiente material.
+
+            MATERIAL:
+            \(chunk.material)
+            """
+        } else {
+            prompt = """
+            RECURSOS:
+            \(chunk.resourceList)
+
+            Fragmento \(chunkIndex + 1) de \(totalChunks). Genera \(cardsTarget) tarjetas Anki de este fragmento.
+
+            MATERIAL:
+            \(chunk.material)
+            """
+        }
+
+        fmLog("generateAnkiChunk", "  chunk \(chunkIndex+1)/\(totalChunks) → prompt=\(prompt.count)chars target=\(cardsTarget)")
+
+        if totalChunks == 1 {
+            return try await executeGeneration(tag: "generateAnkiChunk[\(chunkIndex)]") {
+                try await session.respond(to: prompt, generating: GeneratedAnkiPack.self)
+            } transform: { response in
+                response.content.cards.compactMap {
+                    mapGeneratedAnkiItem($0, titleToId: titleToId, fallbackResourceId: fallbackResourceId)
+                }
+            }
+        } else {
+            return try await executeGeneration(tag: "generateAnkiChunk[\(chunkIndex)]") {
+                try await session.respond(to: prompt, generating: GeneratedAnkiChunk.self)
+            } transform: { response in
+                response.content.cards.compactMap {
+                    mapGeneratedAnkiItem($0, titleToId: titleToId, fallbackResourceId: fallbackResourceId)
+                }
+            }
+        }
+    }
+
+    private static func mapGeneratedAnkiItem(
+        _ item: GeneratedAnkiItem,
+        titleToId: [String: UUID],
+        fallbackResourceId: UUID?
+    ) -> EditableAnkiCard? {
+        let front = item.front.trimmingCharacters(in: .whitespacesAndNewlines)
+        let back = item.back.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard front.count >= 3, back.count >= 2 else { return nil }
+        let rid = titleToId[item.sourceResourceTitle] ?? fallbackResourceId
+        guard let resourceId = rid else { return nil }
+        let tags = item.tags.prefix(3).filter { !$0.isEmpty }
+        return EditableAnkiCard(
+            resourceId: resourceId,
+            front: front,
+            back: back,
+            tags: tags.isEmpty ? [String(front.prefix(20))] : Array(tags)
+        )
+    }
+
     // MARK: - Generación desde lagunas de conocimiento
 
     /// Genera flashcards enfocadas en los conceptos débiles detectados por el gap analysis.

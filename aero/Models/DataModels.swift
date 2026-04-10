@@ -16,11 +16,36 @@ final class SDStudy {
     @Relationship(deleteRule: .cascade, inverse: \SDFlashcard.study)
     var flashcards: [SDFlashcard] = []
 
+    @Relationship(deleteRule: .cascade, inverse: \SDAnkiCard.study)
+    var ankiCards: [SDAnkiCard] = []
+
+    @Relationship(deleteRule: .cascade, inverse: \SDStudyBoard.study)
+    var board: SDStudyBoard?
+
     init(title: String, desc: String) {
         self.id = UUID()
         self.title = title
         self.desc = desc
         self.createdAt = Date()
+    }
+}
+
+// MARK: - Study board (pizarra tipo canvas por estudio)
+
+@Model
+final class SDStudyBoard {
+    @Attribute(.unique) var id: UUID
+    /// JSON `BoardDocument`
+    var documentJSON: String
+    var updatedAt: Date
+
+    var study: SDStudy?
+
+    init(documentJSON: String = "", study: SDStudy) {
+        self.id = UUID()
+        self.documentJSON = documentJSON
+        self.updatedAt = Date()
+        self.study = study
     }
 }
 
@@ -177,6 +202,75 @@ final class SDAttempt {
     }
 }
 
+// MARK: - Anki Card
+
+@Model
+final class SDAnkiCard {
+    @Attribute(.unique) var id: UUID
+    var front: String
+    var back: String
+    var tags: [String]
+    var createdAt: Date
+
+    // SM-2 spaced repetition
+    var nextReviewAt: Date
+    var easeFactor: Double
+    var intervalDays: Int
+    var repetitions: Int
+
+    /// Historial de calificaciones SM-2 (1-5). Usado para calcular lagunas de conocimiento.
+    var ratingHistory: [Int] = []
+
+    var study: SDStudy?
+    var resource: SDResource?
+
+    init(front: String, back: String, tags: [String], study: SDStudy, resource: SDResource?) {
+        self.id = UUID()
+        self.front = front
+        self.back = back
+        self.tags = tags
+        self.createdAt = Date()
+        self.nextReviewAt = Date()
+        self.easeFactor = 2.5
+        self.intervalDays = 0
+        self.repetitions = 0
+        self.ratingHistory = []
+        self.study = study
+        self.resource = resource
+    }
+
+    func updateSM2(quality: Int) {
+        let q = min(5, max(0, quality))
+        ratingHistory.append(q)
+        let newEF = max(1.3, easeFactor + (0.1 - Double(5 - q) * (0.08 + Double(5 - q) * 0.02)))
+        if q < 3 {
+            repetitions = 0
+            intervalDays = 0
+        } else {
+            repetitions += 1
+            switch repetitions {
+            case 1: intervalDays = 1
+            case 2: intervalDays = 6
+            default: intervalDays = Int(round(Double(intervalDays) * easeFactor))
+            }
+        }
+        easeFactor = newEF
+        nextReviewAt = Calendar.current.date(byAdding: .day, value: max(1, intervalDays), to: Date()) ?? Date()
+    }
+
+    /// Tasa de error Anki: proporción de calificaciones < 3 (De nuevo / muy difícil).
+    var ankiErrorRate: Double {
+        guard !ratingHistory.isEmpty else { return 0 }
+        let failures = ratingHistory.filter { $0 < 3 }.count
+        return Double(failures) / Double(ratingHistory.count)
+    }
+
+    /// true si la tarjeta ha sido calificada como difícil de forma recurrente.
+    var isStruggling: Bool {
+        ratingHistory.count >= 2 && ankiErrorRate > 0.3
+    }
+}
+
 // MARK: - Gap Analysis (computed, not persisted)
 
 struct GapAnalysis {
@@ -186,7 +280,12 @@ struct GapAnalysis {
     let gaps: [ConceptGap]
     let strongConcepts: [StrongConcept]
 
-    static func compute(flashcards: [SDFlashcard]) -> GapAnalysis {
+    // Anki-specific stats
+    let ankiTotalReviews: Int
+    let ankiGaps: [ConceptGap]
+    let ankiStrongConcepts: [StrongConcept]
+
+    static func compute(flashcards: [SDFlashcard], ankiCards: [SDAnkiCard] = []) -> GapAnalysis {
         var conceptStats: [String: (total: Int, errors: Int, lastSeen: Date?, errorTypes: [ErrorType])] = [:]
         var errorTypeCounts: [ErrorType: Int] = [:]
 
@@ -245,12 +344,58 @@ struct GapAnalysis {
             .sorted { $0.value > $1.value }
             .map { (type: $0.key, count: $0.value) }
 
+        // ── Anki gaps ──
+        var ankiConceptStats: [String: (total: Int, failures: Int)] = [:]
+        for card in ankiCards where !card.ratingHistory.isEmpty {
+            let failures = card.ratingHistory.filter { $0 < 3 }.count
+            for tag in card.tags {
+                let key = tag.lowercased()
+                var stat = ankiConceptStats[key] ?? (0, 0)
+                stat.total += card.ratingHistory.count
+                stat.failures += failures
+                ankiConceptStats[key] = stat
+            }
+        }
+
+        var ankiGaps: [ConceptGap] = []
+        var ankiStrong: [StrongConcept] = []
+        let ankiTotalReviews = ankiCards.reduce(0) { $0 + $1.ratingHistory.count }
+
+        for (concept, stat) in ankiConceptStats {
+            let errorRate = Double(stat.failures) / Double(stat.total)
+            // Laguna: al menos 2 repasos y tasa de olvido alta
+            if stat.total >= 2 && errorRate > 0.4 {
+                ankiGaps.append(ConceptGap(
+                    concept: concept,
+                    error_rate: errorRate,
+                    total_attempts: stat.total,
+                    errors: stat.failures,
+                    dominant_error_type: nil,
+                    trend: "estable",
+                    last_seen: nil
+                ))
+            // Dominado: al menos 5 repasos y tasa de olvido muy baja
+            } else if stat.total >= 5 && errorRate <= 0.2 {
+                ankiStrong.append(StrongConcept(
+                    concept: concept,
+                    error_rate: errorRate,
+                    total_attempts: stat.total
+                ))
+            }
+            // Entre medias: en progreso, no se muestra en ninguna lista todavía
+        }
+        ankiGaps.sort { $0.error_rate > $1.error_rate }
+        ankiStrong.sort { $0.error_rate < $1.error_rate }
+
         return GapAnalysis(
-            studyId: flashcards.first?.study?.id ?? UUID(),
+            studyId: flashcards.first?.study?.id ?? ankiCards.first?.study?.id ?? UUID(),
             totalAttempts: totalAttempts,
             errorTypeBreakdown: breakdown,
             gaps: gaps,
-            strongConcepts: strong
+            strongConcepts: strong,
+            ankiTotalReviews: ankiTotalReviews,
+            ankiGaps: ankiGaps,
+            ankiStrongConcepts: ankiStrong
         )
     }
 }
