@@ -53,19 +53,20 @@ struct StudyDetailView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .tint(Color.aeroNavy)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if selectedTab == 0 {
                     Button {
                         viewModel.showingAddResource = true
                     } label: {
-                        Image(systemName: "plus.circle")
+                        Image(systemName: "plus.circle.fill")
                     }
                 } else if selectedTab == 1 {
                     Button {
                         viewModel.showingGenerateAnkiCards = true
                     } label: {
-                        Image(systemName: "plus.circle")
+                        Image(systemName: "plus.circle.fill")
                     }
                     .disabled(viewModel.resources.isEmpty)
                 } else if selectedTab == 2 {
@@ -84,7 +85,7 @@ struct StudyDetailView: View {
                         }
                         .disabled(viewModel.resources.isEmpty)
                     } label: {
-                        Image(systemName: "plus.circle")
+                        Image(systemName: "plus.circle.fill")
                     }
                 } else {
                     EmptyView()
@@ -131,13 +132,20 @@ struct StudyHeroHeader: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             LinearGradient(
-                colors: [Color(red: 0.28, green: 0.22, blue: 0.92), Color(red: 0.52, green: 0.28, blue: 0.96)],
+                colors: [Color.aeroNavy, Color.aeroNavyDeep],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea(edges: .top)
 
             VStack(alignment: .leading, spacing: 8) {
+                Text("Tema actual")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.white.opacity(0.72))
+                    .textCase(.uppercase)
+                    .tracking(1.35)
+
                 Text(study.title)
                     .font(isLargeCanvas ? .largeTitle : .title2)
                     .fontWeight(.bold)
@@ -145,7 +153,7 @@ struct StudyHeroHeader: View {
 
                 Text(study.desc)
                     .font(isLargeCanvas ? .body : .subheadline)
-                    .foregroundStyle(.white.opacity(0.8))
+                    .foregroundStyle(.white.opacity(0.82))
                     .lineLimit(isLargeCanvas ? 3 : 2)
 
                 if hasPractice {
@@ -166,7 +174,7 @@ struct StudyHeroHeader: View {
                                             .font(isLargeCanvas ? .body : .subheadline)
                                     }
                                 }
-                                .foregroundStyle(Color(red: 0.08, green: 0.55, blue: 0.55))
+                                .foregroundStyle(Color.aeroNavy)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, isLargeCanvas ? 12 : 9)
                                 .background(Color.white, in: Capsule())
@@ -181,10 +189,11 @@ struct StudyHeroHeader: View {
                                         .fontWeight(.semibold)
                                         .font(isLargeCanvas ? .body : .subheadline)
                                 }
-                                .foregroundStyle(Color(red: 0.28, green: 0.22, blue: 0.92))
+                                .foregroundStyle(Color.white)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, isLargeCanvas ? 12 : 9)
-                                .background(Color.white, in: Capsule())
+                                .background(Color.aeroLavender.opacity(0.35), in: Capsule())
+                                .overlay(Capsule().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
                             }
                         }
                     }
@@ -202,45 +211,59 @@ struct StudyHeroHeader: View {
 
 // MARK: - Custom Tab Picker
 
+private struct StudyTabDefinition: Identifiable {
+    let id: Int
+    let title: String
+    let systemImage: String
+}
+
 struct StudyTabPicker: View {
     @Binding var selectedTab: Int
     let isLargeCanvas: Bool
+    @Environment(\.colorScheme) private var colorScheme
 
-    private let tabs: [(String, String)] = [
-        ("Recursos", "doc.text"),
-        ("Flashcards", "rectangle.on.rectangle.angled"),
-        ("Examen", "doc.questionmark.fill"),
-        ("Progreso", "chart.bar"),
-        ("Pizarra", "scribble.variable")
+    private let tabs: [StudyTabDefinition] = [
+        .init(id: 0, title: "Recursos", systemImage: "doc.text"),
+        .init(id: 1, title: "Flashcards", systemImage: "rectangle.on.rectangle.angled"),
+        .init(id: 2, title: "Examen", systemImage: "doc.questionmark.fill"),
+        .init(id: 3, title: "Progreso", systemImage: "chart.bar"),
+        .init(id: 4, title: "Pizarra", systemImage: "scribble.variable")
     ]
 
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(tabs.indices, id: \.self) { idx in
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
-                        selectedTab = idx
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 4) {
+                ForEach(tabs) { tab in
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
+                            selectedTab = tab.id
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: tab.systemImage).font(.caption)
+                            Text(tab.title)
+                                .font(isLargeCanvas ? .body : .subheadline)
+                                .fontWeight(selectedTab == tab.id ? .semibold : .regular)
+                        }
+                        .foregroundStyle(selectedTab == tab.id ? Color.white : Color.secondary)
+                        .padding(.horizontal, isLargeCanvas ? 18 : 14)
+                        .padding(.vertical, isLargeCanvas ? 11 : 9)
+                        .background(
+                            Capsule().fill(selectedTab == tab.id ? Color.aeroNavy : Color.clear)
+                        )
                     }
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: tabs[idx].1).font(.caption)
-                        Text(tabs[idx].0)
-                            .font(isLargeCanvas ? .body : .subheadline)
-                            .fontWeight(selectedTab == idx ? .semibold : .regular)
-                    }
-                    .foregroundColor(selectedTab == idx ? .white : .secondary)
-                    .padding(.horizontal, isLargeCanvas ? 18 : 14)
-                    .padding(.vertical, isLargeCanvas ? 11 : 9)
-                    .background(
-                        Capsule().fill(selectedTab == idx ? Color.indigo : Color.clear)
-                    )
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(tab.title)
+                    .accessibilityAddTraits(selectedTab == tab.id ? .isSelected : [])
                 }
             }
+            .padding(.horizontal, 4)
         }
-        .padding(5)
+        .padding(6)
         .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.aeroCardFill)
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.08), radius: 14, y: 5)
         )
         .padding(.horizontal, isLargeCanvas ? 24 : 16)
         .padding(.vertical, 12)
@@ -248,6 +271,43 @@ struct StudyTabPicker: View {
 }
 
 // MARK: - Resources Tab
+
+private enum TopicMasterySnapshot {
+    static func compute(from viewModel: StudyDetailViewModel) -> (percent: Int, progress: Double, footnote: String) {
+        let resources = viewModel.resources.count
+        let examAttempts = viewModel.flashcards.flatMap(\.attempts)
+        let totalAtt = examAttempts.count
+        let correctAtt = examAttempts.filter(\.isCorrect).count
+        let examAcc = totalAtt > 0 ? Double(correctAtt) / Double(totalAtt) : nil
+
+        let ankiCards = viewModel.ankiCards
+        let totalReviews = ankiCards.reduce(0) { $0 + $1.ratingHistory.count }
+        let failures = ankiCards.reduce(0) { $0 + $1.ratingHistory.filter { $0 < 3 }.count }
+        let ankiAcc = totalReviews > 0 ? Double(totalReviews - failures) / Double(totalReviews) : nil
+
+        let combined: Double?
+        if let e = examAcc, let a = ankiAcc {
+            combined = (e + a) / 2
+        } else if let e = examAcc {
+            combined = e
+        } else if let a = ankiAcc {
+            combined = a
+        } else {
+            combined = nil
+        }
+
+        if let c = combined {
+            let pct = Int((c * 100).rounded())
+            let foot = "Basado en examen simulado y flashcards. \(resources) recurso\(resources == 1 ? "" : "s") en este tema."
+            return (pct, c, foot)
+        }
+
+        if resources == 0 {
+            return (0, 0, "Añade materiales y practica para ver aquí tu dominio del tema.")
+        }
+        return (0, 0, "Practica el examen o las flashcards para calcular tu dominio. Tienes \(resources) recurso\(resources == 1 ? "" : "s").")
+    }
+}
 
 struct ResourcesTab: View {
     @ObservedObject var viewModel: StudyDetailViewModel
@@ -260,38 +320,93 @@ struct ResourcesTab: View {
         return [GridItem(.flexible())]
     }
 
+    private var mastery: (percent: Int, progress: Double, footnote: String) {
+        TopicMasterySnapshot.compute(from: viewModel)
+    }
+
     var body: some View {
         if viewModel.resources.isEmpty {
-            ContentUnavailableView(
-                "Sin recursos todavía",
-                systemImage: "doc.badge.plus",
-                description: Text("Agrega apuntes o PDFs para que la IA genere flashcards automáticamente.")
-            )
-            .overlay(alignment: .bottom) {
-                Button {
-                    viewModel.showingAddResource = true
-                } label: {
-                    Label("Agregar recurso", systemImage: "plus")
-                        .fontWeight(.semibold)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    AeroDashedAddResourceCard { viewModel.showingAddResource = true }
+
+                    AeroTopicMasteryCard(
+                        percent: mastery.percent,
+                        footnote: mastery.footnote,
+                        progress: mastery.progress
+                    )
+
+                    Button {
+                        viewModel.showingAddResource = true
+                    } label: {
+                        Label("Explorar archivos", systemImage: "folder")
+                            .fontWeight(.semibold)
+                    }
+                    .buttonStyle(AeroPrimaryButtonStyle())
                 }
-                .buttonStyle(AeroPrimaryButtonStyle())
-                .padding(.horizontal, 40)
-                .padding(.bottom, 34)
+                .padding(.horizontal, isLargeCanvas ? 24 : 16)
+                .padding(.vertical, 16)
             }
         } else {
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 10) {
-                    ForEach(viewModel.resources) { resource in
-                        NavigationLink {
-                            ResourceDetailView(studyViewModel: viewModel, resource: resource)
-                        } label: {
-                            ResourceCardView(resource: resource, isLargeCanvas: isLargeCanvas)
+                VStack(alignment: .leading, spacing: 18) {
+                    Group {
+                        if isLargeCanvas {
+                            HStack(alignment: .top, spacing: 14) {
+                                AeroDashedAddResourceCard { viewModel.showingAddResource = true }
+                                    .frame(maxWidth: .infinity)
+                                AeroTopicMasteryCard(
+                                    percent: mastery.percent,
+                                    footnote: mastery.footnote,
+                                    progress: mastery.progress
+                                )
+                                .frame(maxWidth: .infinity)
+                            }
+                        } else {
+                            AeroDashedAddResourceCard { viewModel.showingAddResource = true }
+                            AeroTopicMasteryCard(
+                                percent: mastery.percent,
+                                footnote: mastery.footnote,
+                                progress: mastery.progress
+                            )
                         }
-                        .buttonStyle(.plain)
+                    }
+
+                    AeroSectionCaption(text: "Materiales de la biblioteca")
+
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(viewModel.resources) { resource in
+                            NavigationLink {
+                                ResourceDetailView(studyViewModel: viewModel, resource: resource)
+                            } label: {
+                                ResourceCardView(resource: resource, isLargeCanvas: isLargeCanvas)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
                 .padding(.horizontal, isLargeCanvas ? 24 : 16)
-                .padding(.vertical, 12)
+                .padding(.vertical, 14)
+                .padding(.bottom, 72)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                HStack {
+                    Spacer()
+                    Button {
+                        viewModel.showingAddResource = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.title2.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 56, height: 56)
+                            .background(Circle().fill(Color.aeroNavy))
+                            .shadow(color: Color.aeroNavy.opacity(0.4), radius: 14, y: 6)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Agregar recurso")
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 6)
+                }
             }
         }
     }
@@ -300,43 +415,64 @@ struct ResourcesTab: View {
 struct ResourceCardView: View {
     let resource: SDResource
     let isLargeCanvas: Bool
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var titleInk: Color { colorScheme == .light ? Color.aeroNavy : Color.primary }
+
+    private var isPDF: Bool { resource.sourceName?.lowercased().hasSuffix(".pdf") == true }
+
+    private var iconBackground: Color {
+        if isPDF { return Color.red.opacity(0.12) }
+        return Color.yellow.opacity(0.14)
+    }
+
+    private var iconForeground: Color {
+        if isPDF { return Color.red.opacity(0.85) }
+        return Color.orange.opacity(0.9)
+    }
 
     var body: some View {
         AeroSurfaceCard {
             HStack(spacing: 14) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.indigo.opacity(0.1))
-                        .frame(width: 46, height: 46)
-                    Image(systemName: resource.sourceName?.lowercased().hasSuffix(".pdf") == true
-                          ? "doc.richtext" : "doc.text")
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(iconBackground)
+                        .frame(width: 48, height: 48)
+                    Image(systemName: isPDF ? "doc.richtext.fill" : "doc.text.fill")
                         .font(.title3)
-                        .foregroundStyle(.indigo)
+                        .foregroundStyle(iconForeground)
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(resource.title)
                         .font(isLargeCanvas ? .title3 : .headline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(titleInk)
                         .lineLimit(1)
                     Text(resource.content)
                         .font(isLargeCanvas ? .callout : .caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(isLargeCanvas ? 3 : 2)
-                    if let src = resource.sourceName {
-                        Label(src, systemImage: "paperclip")
-                            .font(.caption2)
-                            .foregroundStyle(.indigo)
-                    }
+                    Text(metaLine)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                 }
 
-                Spacer()
+                Spacer(minLength: 4)
 
                 Image(systemName: "chevron.right")
-                    .font(.caption)
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private var metaLine: String {
+        let date = resource.createdAt.formatted(date: .abbreviated, time: .omitted)
+        let chars = resource.content.count
+        if let src = resource.sourceName {
+            return "\(date) · \(chars) caracteres · \(src)"
+        }
+        return "\(date) · \(chars) caracteres"
     }
 }
 
@@ -420,10 +556,12 @@ struct AnkiCardsTab: View {
                     .background(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .fill(LinearGradient(
-                                colors: dueCount > 0 ? [.indigo, .purple] : [.teal, .indigo],
+                                colors: dueCount > 0
+                                    ? [Color.aeroNavy, Color.aeroNavyDeep]
+                                    : [Color.aeroMint.opacity(0.85), Color.aeroNavy],
                                 startPoint: .leading, endPoint: .trailing
                             ))
-                            .shadow(color: .indigo.opacity(0.3), radius: 14, y: 6)
+                            .shadow(color: Color.aeroNavy.opacity(0.35), radius: 14, y: 6)
                     )
                 }
                 .padding(.horizontal, isLargeCanvas ? 24 : 16)
@@ -549,7 +687,7 @@ struct ExamenSimuladoTab: View {
                             .fontWeight(.semibold)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.indigo.opacity(0.75))
+                    .tint(Color.aeroNavy.opacity(0.9))
                     .disabled(viewModel.resources.isEmpty)
                     .controlSize(isLargeCanvas ? .large : .regular)
                 }
@@ -577,6 +715,9 @@ struct FlashcardItemView: View {
     let isLargeCanvas: Bool
     var onDelete: (() -> Void)? = nil
     @State private var isExpanded = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var questionInk: Color { colorScheme == .light ? Color.aeroNavy : Color.primary }
 
     var body: some View {
         Button {
@@ -589,10 +730,10 @@ struct FlashcardItemView: View {
                               systemImage: card.type == .open ? "text.bubble" : "list.bullet.circle")
                             .font(.caption)
                             .fontWeight(.semibold)
-                            .foregroundStyle(card.type == .open ? Color.indigo : Color.purple)
+                            .foregroundStyle(card.type == .open ? Color.aeroNavy : Color.aeroLavender)
                             .padding(.horizontal, 9)
                             .padding(.vertical, 4)
-                            .background((card.type == .open ? Color.indigo : Color.purple).opacity(0.1))
+                            .background((card.type == .open ? Color.aeroNavy : Color.aeroLavender).opacity(0.12))
                             .clipShape(.rect(cornerRadius: 7))
 
                         Spacer()
@@ -613,6 +754,7 @@ struct FlashcardItemView: View {
                     Text(card.question)
                         .font(isLargeCanvas ? .callout : .body)
                         .fontWeight(.medium)
+                        .foregroundStyle(questionInk)
                         .lineLimit(isExpanded ? nil : 3)
                         .frame(maxWidth: .infinity, alignment: .leading)
 

@@ -3,6 +3,8 @@ import SwiftData
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dismiss) private var dismiss
     @Query private var profiles: [UserProfile]
 
     @AppStorage("userName") private var userName: String = ""
@@ -12,22 +14,58 @@ struct SettingsView: View {
     @AppStorage("focusMode") private var focusMode: Bool = false
     @AppStorage("reduceMotion") private var reduceMotion: String = "auto" // auto | on | off
     @AppStorage("textSize") private var textSize: String = "normal" // normal | large | extraLarge
+    /// system | light | dark
+    @AppStorage("colorSchemePreference") private var colorSchemePreference: String = "system"
 
     @State private var nameDraft: String = ""
 
     private var profile: UserProfile? { profiles.first }
+    private var isWide: Bool { horizontalSizeClass == .regular }
 
     var body: some View {
         Form {
-            Section("Perfil") {
-                TextField("Nombre", text: $nameDraft)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit { saveName() }
-                Button("Guardar nombre") { saveName() }
-                    .disabled(nameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Section {
+                HStack(alignment: .center, spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.aeroNavy, Color.aeroLavender],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: isWide ? 72 : 60, height: isWide ? 72 : 60)
+                        Text(profileInitials)
+                            .font(isWide ? .title2 : .title3)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                    }
+                    .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Tu espacio de estudio")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                            .tracking(0.6)
+                        TextField("Nombre", text: $nameDraft)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.body)
+                            .onSubmit { saveName() }
+                        Button("Guardar nombre") { saveName() }
+                            .buttonStyle(AeroSecondaryButtonStyle())
+                            .disabled(nameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+                .padding(.vertical, 6)
+            } header: {
+                Label("Perfil", systemImage: "person.crop.circle")
+            } footer: {
+                Text("Usamos tu nombre para saludarte y personalizar la lista de estudios.")
             }
 
-            Section("Estilo de estudio") {
+            Section {
                 ForEach(sessionOptions) { opt in
                     MultipleSelectionRow(
                         title: opt.title,
@@ -37,9 +75,13 @@ struct SettingsView: View {
                         toggleSession(opt.key)
                     }
                 }
+            } header: {
+                Label("Estilo de estudio", systemImage: "slider.horizontal.3")
+            } footer: {
+                Text("La app adapta sesiones y sugerencias según lo que marques. Puedes combinar varias opciones.")
             }
 
-            Section("Accesibilidad") {
+            Section {
                 ForEach(accessibilityOptions) { opt in
                     MultipleSelectionRow(
                         title: opt.title,
@@ -49,16 +91,26 @@ struct SettingsView: View {
                         toggleAccessibility(opt.key)
                     }
                 }
+            } header: {
+                Label("Accesibilidad", systemImage: "accessibility")
+            } footer: {
+                Text("Estas preferencias ayudan a ajustar contraste, movimiento y tamaño de texto cuando tiene sentido.")
             }
 
-            Section("Apariencia") {
+            Section {
+                Picker("Tema de la app", selection: $colorSchemePreference) {
+                    Text("Sistema").tag("system")
+                    Text("Claro").tag("light")
+                    Text("Oscuro").tag("dark")
+                }
+
                 Toggle("Modo Focus", isOn: $focusMode)
                     .onChange(of: focusMode) { _, _ in syncProfile() }
 
                 Picker("Reducir movimiento", selection: $reduceMotion) {
-                    Text("AUTO").tag("auto")
-                    Text("ON").tag("on")
-                    Text("OFF").tag("off")
+                    Text("Automático").tag("auto")
+                    Text("Sí").tag("on")
+                    Text("No").tag("off")
                 }
                 .onChange(of: reduceMotion) { _, _ in syncProfile() }
 
@@ -68,15 +120,52 @@ struct SettingsView: View {
                     Text("Muy grande").tag("extraLarge")
                 }
                 .onChange(of: textSize) { _, _ in syncProfile() }
+            } header: {
+                Label("Apariencia", systemImage: "sparkles")
+            } footer: {
+                Text("Modo oscuro forzado solo afecta a esta app. «Sistema» sigue el tema de iPad, iPhone o Mac.")
             }
         }
         .navigationTitle("Configuración")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityLabel("Cerrar configuración")
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Listo") { dismiss() }
+                    .fontWeight(.semibold)
+            }
+        }
         .onAppear {
             nameDraft = userName.isEmpty ? (profile?.name ?? "") : userName
             if userName.isEmpty, let p = profile, !p.name.isEmpty {
                 userName = p.name
             }
         }
+    }
+
+    private var profileInitials: String {
+        let trimmed = nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let source = trimmed.isEmpty ? userName : trimmed
+        let parts = source.split(separator: " ").filter { !$0.isEmpty }
+        if parts.count >= 2 {
+            let a = parts[0].prefix(1)
+            let b = parts[1].prefix(1)
+            return "\(a)\(b)".uppercased()
+        }
+        if let first = parts.first {
+            return String(first.prefix(2)).uppercased()
+        }
+        return "AE"
     }
 
     private var selectedSession: Set<String> { Set(parseCSV(sessionStyle)) }
@@ -151,15 +240,19 @@ private struct MultipleSelectionRow: View {
                 Image(systemName: systemImage)
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(.secondary)
+                    .frame(width: 24, alignment: .center)
                 Text(title)
                     .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
                 Spacer()
                 if isSelected {
-                    Image(systemName: "checkmark")
+                    Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.tint)
                         .fontWeight(.semibold)
                 }
             }
+            .contentShape(Rectangle())
+            .padding(.vertical, 6)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)

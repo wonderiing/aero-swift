@@ -7,7 +7,17 @@ struct AppRootView: View {
     @AppStorage("accessibilityNeeds") private var accessibilityNeeds: String = ""
     @AppStorage("reduceMotion") private var reduceMotion: String = "auto" // auto | on | off
     @AppStorage("focusMode") private var focusMode: Bool = false
+    /// system | light | dark
+    @AppStorage("colorSchemePreference") private var colorSchemePreference: String = "system"
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+    private var preferredColorScheme: ColorScheme? {
+        switch colorSchemePreference.lowercased() {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
 
     private var needs: Set<String> {
         Set(accessibilityNeeds.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
@@ -42,11 +52,13 @@ struct AppRootView: View {
     var body: some View {
         Group {
             if hasCompletedOnboarding {
-                StudyListHostView()
+                StudyListView()
             } else {
                 OnboardingFlowView()
             }
         }
+        .preferredColorScheme(preferredColorScheme)
+        .tint(Color.aeroNavy)
         .modifier(DynamicTypeOverride(dynamicType: effectiveDynamicType))
         .environment(\.imageScale, wantsHighContrast ? .large : .medium)
         .environment(\.legibilityWeight, wantsHighContrast ? .bold : .regular)
@@ -64,29 +76,6 @@ private struct DynamicTypeOverride: ViewModifier {
         } else {
             content
         }
-    }
-}
-
-private struct StudyListHostView: View {
-    @State private var showSettings = false
-
-    var body: some View {
-        StudyListView()
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                    .accessibilityLabel("Configuración")
-                }
-            }
-            .sheet(isPresented: $showSettings) {
-                NavigationStack {
-                    SettingsView()
-                }
-            }
     }
 }
 

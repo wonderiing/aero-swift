@@ -33,7 +33,7 @@ final class StudyCanvasStore: ObservableObject {
 
     @Published var document: BoardDocument = .empty
     @Published var tool: CanvasDrawingTool = .select
-    @Published var strokeColor: Color = Color(red: 0.25, green: 0.2, blue: 0.55)
+    @Published var strokeColor: Color = Color.aeroNavy
     @Published var strokeWidth: CGFloat = 3
     @Published var selectedId: UUID?
 
@@ -166,10 +166,10 @@ private struct StudyBoardCanvasView: View {
             GeometryReader { geo in
                 let vp = geo.size
                 ZStack {
-                    Color(.secondarySystemBackground)
+                    Color.aeroSecondaryBackground
                     ZStack(alignment: .topLeading) {
-                        Color(red: 0.98, green: 0.98, blue: 0.99)
-                        InfiniteViewportGrid(pan: panOffset, zoom: canvasZoom, viewport: vp)
+                        Color.aeroGroupedBackground
+                        InfiniteViewportDotGrid(pan: panOffset, zoom: canvasZoom, viewport: vp)
                         ZStack(alignment: .topLeading) {
                             Color.clear
                                 .frame(width: 1, height: 1)
@@ -202,7 +202,7 @@ private struct StudyBoardCanvasView: View {
             }
             .padding(.horizontal, 10)
             .padding(.bottom, 10)
-            .background(Color(.secondarySystemBackground))
+            .background(Color.aeroSecondaryBackground)
         }
         .alert("¿Vaciar la pizarra?", isPresented: $showClearConfirm) {
             Button("Cancelar", role: .cancel) {}
@@ -462,10 +462,11 @@ private struct StudyBoardCanvasView: View {
                     } label: {
                         Image(systemName: t.symbol)
                             .font(.body.weight(store.tool == t ? .semibold : .regular))
+                            .foregroundStyle(store.tool == t ? Color.aeroNavy : Color.primary)
                             .frame(width: 38, height: 34)
                             .background(
                                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                    .fill(store.tool == t ? Color.indigo.opacity(0.22) : Color.primary.opacity(0.05))
+                                    .fill(store.tool == t ? Color.aeroNavy.opacity(0.18) : Color.primary.opacity(0.05))
                             )
                     }
                     .buttonStyle(.plain)
@@ -543,10 +544,16 @@ private struct StudyBoardCanvasView: View {
                 }
                 .accessibilityLabel("Vaciar pizarra")
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
         }
-        .background(.ultraThinMaterial)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.aeroCardFill)
+                .shadow(color: .black.opacity(0.07), radius: 12, y: 4)
+        )
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
     }
 
     @ViewBuilder
@@ -694,8 +701,8 @@ private struct PenStrokePath: Shape {
     }
 }
 
-/// Cuadrícula en coordenadas de mundo; se recorta al viewport (estilo lienzo infinito).
-private struct InfiniteViewportGrid: View {
+/// Cuadrícula de puntos en coordenadas de mundo (estilo lienzo tipo mockup).
+private struct InfiniteViewportDotGrid: View {
     var pan: CGSize
     var zoom: CGFloat
     var viewport: CGSize
@@ -703,9 +710,9 @@ private struct InfiniteViewportGrid: View {
     var body: some View {
         Canvas(rendersAsynchronously: true) { context, size in
             let z = max(zoom, 0.12)
-            var stepWorld: CGFloat = 20
-            while stepWorld * z < 14 { stepWorld *= 2 }
-            while stepWorld * z > 56 { stepWorld /= 2 }
+            var stepWorld: CGFloat = 24
+            while stepWorld * z < 18 { stepWorld *= 2 }
+            while stepWorld * z > 72 { stepWorld /= 2 }
 
             let tlX = (0 - pan.width) / z
             let tlY = (0 - pan.height) / z
@@ -717,27 +724,22 @@ private struct InfiniteViewportGrid: View {
             let y0 = floor(tlY / stepWorld) * stepWorld
             let y1 = ceil(brY / stepWorld) * stepWorld
 
-            var path = Path()
+            var dotCount = 0
             var x = x0
-            var lineCount = 0
-            while x <= x1, lineCount < 220 {
-                let sx = x * z + pan.width
-                path.move(to: CGPoint(x: sx, y: 0))
-                path.addLine(to: CGPoint(x: sx, y: size.height))
+            while x <= x1, dotCount < 2800 {
+                var y = y0
+                while y <= y1, dotCount < 2800 {
+                    let sx = x * z + pan.width
+                    let sy = y * z + pan.height
+                    if sx >= -6, sx <= size.width + 6, sy >= -6, sy <= size.height + 6 {
+                        let r = CGRect(x: sx - 1.15, y: sy - 1.15, width: 2.3, height: 2.3)
+                        context.fill(Path(ellipseIn: r), with: .color(Color.gray.opacity(0.2)))
+                        dotCount += 1
+                    }
+                    y += stepWorld
+                }
                 x += stepWorld
-                lineCount += 1
             }
-            var y = y0
-            lineCount = 0
-            while y <= y1, lineCount < 220 {
-                let sy = y * z + pan.height
-                path.move(to: CGPoint(x: 0, y: sy))
-                path.addLine(to: CGPoint(x: size.width, y: sy))
-                y += stepWorld
-                lineCount += 1
-            }
-
-            context.stroke(path, with: .color(Color.gray.opacity(0.11)), lineWidth: 1)
         }
         .allowsHitTesting(false)
         .frame(width: viewport.width, height: viewport.height)

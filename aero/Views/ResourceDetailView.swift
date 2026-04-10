@@ -22,9 +22,31 @@ struct ResourceDetailView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     AeroSurfaceCard {
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 10) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(Color.aeroNavy.opacity(0.14))
+                                        .frame(width: 44, height: 44)
+                                    Image(systemName: "doc.text.fill")
+                                        .font(.title3)
+                                        .foregroundStyle(Color.aeroNavy)
+                                }
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Recurso de estudio")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                    Text("Edita el título y el texto. Los cambios se guardan al pulsar Guardar.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            Divider()
                             Label("Título", systemImage: "textformat")
-                                .font(.headline)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
                             TextField("Título", text: $title)
                                 .textFieldStyle(.roundedBorder)
                         }
@@ -32,8 +54,16 @@ struct ResourceDetailView: View {
 
                     AeroSurfaceCard {
                         VStack(alignment: .leading, spacing: 10) {
-                            Label("Contenido", systemImage: "doc.text")
-                                .font(.headline)
+                            HStack {
+                                Label("Contenido", systemImage: "doc.text")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Spacer()
+                                Text("\(content.count) caracteres")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+                            }
                             TextEditor(text: $content)
                                 .frame(minHeight: isLargeCanvas ? 360 : 240)
                                 .padding(8)

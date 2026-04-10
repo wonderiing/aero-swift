@@ -2,8 +2,8 @@ import SwiftUI
 import SwiftData
 
 private enum OnboardingOptionStyle {
-    static let selectedFill = Color.accentColor.opacity(0.12)
-    static let selectedStroke = Color.accentColor.opacity(0.7)
+    static let selectedFill = Color.aeroNavy.opacity(0.12)
+    static let selectedStroke = Color.aeroNavy.opacity(0.55)
     static let unselectedFill = Color.aeroSecondaryBackground.opacity(0.75)
     static let unselectedStroke = Color.secondary.opacity(0.25)
 }
@@ -34,6 +34,9 @@ struct OnboardingFlowView: View {
             AeroAppBackground()
 
             VStack(spacing: 0) {
+                OnboardingStepProgress(current: step, total: 4)
+                    .padding(.bottom, isLargeCanvas ? 14 : 10)
+
                 TabView(selection: $step) {
                     OnboardingWelcomePage(isLargeCanvas: isLargeCanvas) {
                         goNext()
@@ -97,6 +100,7 @@ struct OnboardingFlowView: View {
             .padding(.horizontal, isLargeCanvas ? 24 : 16)
             .padding(.vertical, isLargeCanvas ? 24 : 16)
         }
+        .tint(Color.aeroNavy)
         .onAppear {
             sessionSelections = Set(parseCSV(sessionStyle))
             accessibilitySelections = Set(parseCSV(accessibilityNeeds))
@@ -156,6 +160,43 @@ private func toCSV(_ values: [String]) -> String {
         .joined(separator: ",")
 }
 
+private struct OnboardingStepProgress: View {
+    let current: Int
+    let total: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Paso \(min(current + 1, total)) de \(total)")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Paso \(min(current + 1, total)) de \(total)")
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.18))
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.aeroNavy, Color.aeroLavender],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(8, geo.size.width * CGFloat(min(current + 1, total)) / CGFloat(total)))
+                }
+            }
+            .frame(height: 5)
+            .animation(.spring(response: 0.35, dampingFraction: 0.82), value: current)
+        }
+    }
+}
+
 private struct OnboardingWelcomePage: View {
     let isLargeCanvas: Bool
     let onPrimary: () -> Void
@@ -166,7 +207,7 @@ private struct OnboardingWelcomePage: View {
 
             Image(systemName: "sparkles.rectangle.stack")
                 .font(.system(size: isLargeCanvas ? 72 : 56, weight: .semibold))
-                .foregroundStyle(LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .foregroundStyle(LinearGradient(colors: [Color.aeroNavy, Color.aeroLavender], startPoint: .topLeading, endPoint: .bottomTrailing))
                 .accessibilityHidden(true)
 
             VStack(spacing: 10) {
@@ -298,14 +339,14 @@ private struct SelectCard: View {
                 HStack(alignment: .top) {
                     Image(systemName: systemImage)
                         .font(isLargeCanvas ? .title2 : .title3)
-                        .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                        .foregroundStyle(isSelected ? Color.aeroNavy : .secondary)
                         .symbolRenderingMode(.hierarchical)
                         .accessibilityHidden(true)
 
                     Spacer()
 
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.5))
+                        .foregroundStyle(isSelected ? Color.aeroNavy : Color.secondary.opacity(0.5))
                         .symbolRenderingMode(.hierarchical)
                         .accessibilityHidden(true)
                 }

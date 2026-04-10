@@ -6,17 +6,20 @@ struct StudyListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var showSettings = false
+    @AppStorage("userName") private var userName: String = ""
+
+    private var displayName: String {
+        let t = userName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.isEmpty ? "Estudiante" : t
+    }
 
     private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
     private var contentWidth: CGFloat {
-        isLargeCanvas ? AeroAdaptiveLayout.maxRegularContentWidth : AeroAdaptiveLayout.maxCompactContentWidth
+        isLargeCanvas ? AeroAdaptiveLayout.maxStudyListWidth : AeroAdaptiveLayout.maxCompactContentWidth
     }
 
     private var studyGrid: [GridItem] {
-        if isLargeCanvas {
-            return [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
-        }
-        return [GridItem(.flexible())]
+        AeroAdaptiveLayout.studyGridItems(horizontalSizeClass: horizontalSizeClass)
     }
 
     var body: some View {
@@ -35,13 +38,27 @@ struct StudyListView: View {
                     EmptyStudiesView { viewModel.showingCreateStudy = true }
                 } else {
                     ScrollView {
-                        VStack(spacing: 0) {
-                            StudyStatsBanner(count: viewModel.rows.count, isLargeCanvas: isLargeCanvas)
-                                .padding(.horizontal, isLargeCanvas ? 24 : 16)
-                                .padding(.top, 8)
-                                .padding(.bottom, 16)
+                        VStack(alignment: .leading, spacing: 0) {
+                            StudyStatsBanner(userDisplayName: displayName, count: viewModel.rows.count, isLargeCanvas: isLargeCanvas)
+                                .padding(.horizontal, isLargeCanvas ? 28 : 16)
+                                .padding(.top, isLargeCanvas ? 12 : 8)
+                                .padding(.bottom, isLargeCanvas ? 20 : 16)
 
-                            LazyVGrid(columns: studyGrid, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Biblioteca")
+                                    .font(AeroType.sectionOverline())
+                                    .foregroundStyle(.secondary)
+                                    .textCase(.uppercase)
+                                    .tracking(1.1)
+                                Text("Toca un tema para abrirlo. En iPad verás varias columnas según el ancho de pantalla.")
+                                    .font(isLargeCanvas ? .subheadline : .caption)
+                                    .foregroundStyle(.tertiary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .padding(.horizontal, isLargeCanvas ? 28 : 16)
+                            .padding(.bottom, 12)
+
+                            LazyVGrid(columns: studyGrid, spacing: isLargeCanvas ? 18 : 12) {
                                 ForEach(viewModel.rows) { row in
                                     NavigationLink(destination: StudyDetailView(study: row.study)) {
                                         StudyCardView(row: row, isLargeCanvas: isLargeCanvas)
@@ -63,21 +80,27 @@ struct StudyListView: View {
                                     }
                                 }
                             }
-                            .padding(.horizontal, isLargeCanvas ? 24 : 16)
-                            .padding(.bottom, 30)
+                            .padding(.horizontal, isLargeCanvas ? 28 : 16)
+                            .padding(.bottom, 36)
                         }
                         .frame(maxWidth: contentWidth)
                         .frame(maxWidth: .infinity, alignment: .center)
                     }
                 }
             }
-            .navigationTitle("Mis Estudios")
+            .navigationTitle("Estudios")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
                         showSettings = true
                     } label: {
-                        Image(systemName: "gearshape")
+                        if horizontalSizeClass == .regular {
+                            Label("Ajustes", systemImage: "gearshape.fill")
+                        } else {
+                            Image(systemName: "gearshape.fill")
+                        }
                     }
                     .accessibilityLabel("Configuración")
                 }
@@ -85,10 +108,14 @@ struct StudyListView: View {
                     Button {
                         viewModel.showingCreateStudy = true
                     } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(.indigo)
+                        if horizontalSizeClass == .regular {
+                            Label("Nuevo", systemImage: "plus.circle.fill")
+                        } else {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title3)
+                        }
                     }
+                    .accessibilityLabel("Nuevo estudio")
                 }
             }
             .sheet(isPresented: $viewModel.showingCreateStudy) {
@@ -98,6 +125,8 @@ struct StudyListView: View {
                 NavigationStack {
                     SettingsView()
                 }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
             }
             .onChange(of: viewModel.showingCreateStudy) { _, isPresented in
                 if !isPresented { viewModel.fetchStudies() }
@@ -106,6 +135,7 @@ struct StudyListView: View {
                 viewModel.modelContext = modelContext
                 viewModel.fetchStudies()
             }
+            .tint(Color.aeroNavy)
         }
     }
 }
@@ -113,34 +143,52 @@ struct StudyListView: View {
 // MARK: - Stats Banner
 
 struct StudyStatsBanner: View {
+    let userDisplayName: String
     let count: Int
     let isLargeCanvas: Bool
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var greetingInk: Color { colorScheme == .light ? Color.aeroNavy : Color.primary }
 
     var body: some View {
         AeroSurfaceCard {
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("¡A estudiar!")
-                        .font(isLargeCanvas ? .title3 : .headline)
-                        .fontWeight(.bold)
-                    Text("\(count) tema\(count == 1 ? "" : "s") activo\(count == 1 ? "" : "s")")
-                        .font(isLargeCanvas ? .body : .subheadline)
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Hola, \(userDisplayName)")
+                        .font(AeroType.studyGreeting(largeCanvas: isLargeCanvas))
+                        .foregroundStyle(greetingInk)
+                    Text("Aquí tienes un vistazo de tus temas. Sigue donde lo dejaste o crea uno nuevo.")
+                        .font(AeroType.studyCardBody(largeCanvas: isLargeCanvas))
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 8) {
+                        Label("\(count) activo\(count == 1 ? "" : "s")", systemImage: "books.vertical.fill")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.aeroNavy.opacity(0.12), in: Capsule())
+                            .foregroundStyle(Color.aeroNavy)
+                    }
+                    .padding(.top, 2)
                 }
-                Spacer()
+                Spacer(minLength: 8)
                 ZStack {
                     Circle()
                         .fill(LinearGradient(
-                            colors: [Color.indigo.opacity(0.18), Color.purple.opacity(0.12)],
+                            colors: [Color.aeroNavy.opacity(0.2), Color.aeroLavender.opacity(0.35)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ))
-                        .frame(width: 54, height: 54)
+                        .frame(width: isLargeCanvas ? 72 : 56, height: isLargeCanvas ? 72 : 56)
                     Text("\(count)")
-                        .font(.title2)
+                        .font(isLargeCanvas ? .largeTitle : .title2)
                         .fontWeight(.bold)
-                        .foregroundStyle(.indigo)
+                        .foregroundStyle(Color.aeroNavy)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Estudios activos")
+                .accessibilityValue("\(count)")
             }
         }
     }
@@ -151,13 +199,16 @@ struct StudyStatsBanner: View {
 struct StudyCardView: View {
     let row: StudyRowModel
     let isLargeCanvas: Bool
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var titleInk: Color { colorScheme == .light ? Color.aeroNavy : Color.primary }
 
     var body: some View {
         AeroSurfaceCard {
             HStack(spacing: 0) {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(LinearGradient(
-                        colors: [Color.indigo, Color.purple],
+                        colors: [Color.aeroNavy, Color.aeroLavender.opacity(0.85)],
                         startPoint: .top,
                         endPoint: .bottom
                     ))
@@ -165,20 +216,21 @@ struct StudyCardView: View {
                     .padding(.vertical, 14)
 
                 VStack(alignment: .leading, spacing: 10) {
-                    HStack {
+                    HStack(alignment: .firstTextBaseline) {
                         Text(row.study.title)
-                            .font(isLargeCanvas ? .title3 : .headline)
-                            .foregroundStyle(.primary)
-                        Spacer()
+                            .font(AeroType.studyCardTitle(largeCanvas: isLargeCanvas))
+                            .foregroundStyle(titleInk)
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: 8)
                         Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(isLargeCanvas ? .body : .caption)
+                            .foregroundStyle(.tertiary)
                     }
 
                     Text(row.study.desc)
-                        .font(isLargeCanvas ? .body : .subheadline)
+                        .font(AeroType.studyCardBody(largeCanvas: isLargeCanvas))
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(isLargeCanvas ? 3 : 2)
 
                     if let acc = row.accuracy {
                         let tint: Color = acc >= 0.7 ? .green : acc >= 0.4 ? .orange : .red
@@ -258,7 +310,7 @@ struct EmptyStudiesView: View {
                 ZStack {
                     Circle()
                         .fill(LinearGradient(
-                            colors: [Color.indigo.opacity(0.1), Color.purple.opacity(0.07)],
+                            colors: [Color.aeroNavy.opacity(0.12), Color.aeroLavender.opacity(0.15)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ))
@@ -266,7 +318,7 @@ struct EmptyStudiesView: View {
                     Image(systemName: "books.vertical")
                         .font(.system(size: 48))
                         .foregroundStyle(
-                            LinearGradient(colors: [.indigo, .purple],
+                            LinearGradient(colors: [Color.aeroNavy, Color.aeroLavender],
                                            startPoint: .top, endPoint: .bottom)
                         )
                 }
@@ -280,6 +332,12 @@ struct EmptyStudiesView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
+
+                Text("Flujo sugerido: importa un PDF o pega notas → genera tarjetas con IA → practica con examen simulado.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 8)
 
                 Button(action: action) {
                     Label("Crear primer estudio", systemImage: "plus")
@@ -311,8 +369,7 @@ struct CreateStudyView: View {
             VStack(spacing: 0) {
                 ZStack {
                     LinearGradient(
-                        colors: [Color(red: 0.28, green: 0.22, blue: 0.92),
-                                 Color(red: 0.52, green: 0.28, blue: 0.96)],
+                        colors: [Color.aeroNavy, Color.aeroNavyDeep],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -378,7 +435,7 @@ struct CreateStudyView: View {
 }
 
 #Preview("Banner stats") {
-    StudyStatsBanner(count: 5, isLargeCanvas: false).padding()
+    StudyStatsBanner(userDisplayName: "Alex", count: 5, isLargeCanvas: false).padding()
 }
 
 #Preview("Estudios vacíos") {

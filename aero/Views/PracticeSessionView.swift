@@ -111,10 +111,19 @@ struct ProgressHeader: View {
 
     var body: some View {
         VStack(spacing: 12) {
+            Text("Evaluación actual")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+                .tracking(1.2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
             HStack {
-                Text("Tarjeta \(current) de \(total)")
+                Text("Pregunta \(current) de \(total)")
                     .font(isLargeCanvas ? .title3 : .headline)
                     .fontWeight(.semibold)
+                    .foregroundStyle(Color.aeroNavy)
                 Spacer()
                 if let streak, streak >= 2 {
                     Text("🔥 \(streak)")
@@ -126,10 +135,10 @@ struct ProgressHeader: View {
                 Text("\(Int(Double(current - 1) / Double(max(total, 1)) * 100))%")
                     .font(isLargeCanvas ? .title3 : .headline)
                     .fontWeight(.bold)
-                    .foregroundStyle(.indigo)
+                    .foregroundStyle(Color.aeroNavy)
             }
             ProgressView(value: Double(current - 1), total: Double(max(total, 1)))
-                .tint(.indigo)
+                .tint(Color.aeroMint)
                 .scaleEffect(x: 1, y: 2)
         }
         .padding(.top, 4)
@@ -152,8 +161,10 @@ struct FlashcardView: View {
     let prefersAudio: Bool
     let needs: Set<String>
     @ObservedObject var tts: TextToSpeechManager
+    @Environment(\.colorScheme) private var colorScheme
 
     private var isDyslexia: Bool { needs.contains("dyslexia") }
+    private var questionInk: Color { colorScheme == .light ? Color.aeroNavy : Color.primary }
     private var lineSpacing: CGFloat { isDyslexia ? 7 : 4 }
 
     var body: some View {
@@ -166,10 +177,10 @@ struct FlashcardView: View {
                               systemImage: card.type == .open ? "text.bubble" : "list.bullet.circle")
                             .font(.subheadline)
                             .fontWeight(.semibold)
-                            .foregroundStyle(card.type == .open ? Color.indigo : Color.purple)
+                            .foregroundStyle(card.type == .open ? Color.aeroNavy : Color.aeroLavender)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background((card.type == .open ? Color.indigo : Color.purple).opacity(0.1))
+                            .background((card.type == .open ? Color.aeroNavy : Color.aeroLavender).opacity(0.12))
                             .clipShape(.rect(cornerRadius: 10))
 
                         Spacer()
@@ -190,6 +201,7 @@ struct FlashcardView: View {
                     Text(card.question)
                         .font(isLargeCanvas ? .largeTitle : .title2)
                         .fontWeight(.semibold)
+                        .foregroundStyle(questionInk)
                         .lineSpacing(lineSpacing)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -207,13 +219,13 @@ struct FlashcardView: View {
                 }
             }
             .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(colorScheme == .dark ? Color(white: 0.13) : Color.aeroCardFill)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.20), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.2 : 0.08), lineWidth: 1)
                     )
-                    .shadow(color: .black.opacity(0.07), radius: 14, y: 6)
+                    .shadow(color: .black.opacity(colorScheme == .dark ? 0.45 : 0.08), radius: 16, y: 7)
             )
         }
         .scrollBounceBehavior(.basedOnSize)
