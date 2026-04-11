@@ -23,6 +23,7 @@ final class StudyDetailViewModel: ObservableObject {
     @Published var showingGenerateFlashcards = false
     @Published var showingCreateFlashcardManual = false
     @Published var showingGenerateFromGaps = false
+    @Published var showingGenerateResourcesFromGaps = false
     @Published var showingGenerateAnkiCards = false
     @Published var resourceTitle = ""
     @Published var resourceContent = ""
@@ -65,6 +66,28 @@ final class StudyDetailViewModel: ObservableObject {
             errorMessage = "Error al agregar recurso: \(error.localizedDescription)"
         }
         isLoading = false
+    }
+
+    /// Guarda recursos generados por IA a partir de lagunas (`sourceName` fijo para identificarlos en la lista).
+    func saveGapResourceBatch(_ drafts: [GeneratedGapResourceDraft]) {
+        guard let ctx = modelContext else { return }
+        let source = "IA · Refuerzo por lagunas"
+        var inserted = 0
+        for d in drafts {
+            let t = d.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let c = d.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !t.isEmpty, !c.isEmpty else { continue }
+            let r = SDResource(title: t, content: c, sourceName: source, study: study)
+            ctx.insert(r)
+            inserted += 1
+        }
+        guard inserted > 0 else { return }
+        do {
+            try ctx.save()
+            fetchContent()
+        } catch {
+            errorMessage = "Error al guardar recursos: \(error.localizedDescription)"
+        }
     }
 
     func updateResource(id: UUID, title: String, content: String) {

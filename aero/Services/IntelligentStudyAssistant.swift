@@ -683,6 +683,93 @@ enum IntelligentStudyAssistant {
         }
     }
 
+    // MARK: - Recursos de estudio desde lagunas
+
+    /// Genera uno o más recursos (apuntes) enfocados en las lagunas, para guardar como `SDResource`.
+    static func generateResourcesFromGaps(
+        gaps: [ConceptGap],
+        resources: [(id: UUID, title: String, content: String)],
+        onProgress: (@Sendable (GenerationProgress) -> Void)? = nil
+    ) async throws -> [GeneratedGapResourceDraft] {
+        guard !gaps.isEmpty else { return [] }
+
+        if !isAppleIntelligenceReady {
+            fmLog("generateGapResources", "⏳ Modelo no listo, esperando hasta 10s...")
+            let ready = await waitForModelReadiness(timeout: 10)
+            if !ready {
+                throw StudyAIError.modelUnavailable(unavailabilityReasonDescription())
+            }
+        }
+
+        let conceptList = gaps.prefix(5).map { gap -> String in
+            var line = "- \(gap.concept) (tasa de error: \(Int(gap.error_rate * 100))%"
+            if let errorType = gap.dominant_error_type {
+                line += ", tipo de error: \(errorType.rawValue)"
+            }
+            line += ")"
+            return line
+        }.joined(separator: "\n")
+
+        let resourceList = resources.map { "- \($0.title)" }.joined(separator: "\n")
+        let combinedMaterial: String
+        if resources.isEmpty {
+            combinedMaterial = "(No hay texto de recursos; elabora apuntes coherentes solo a partir de los nombres de lagunas y buenas prácticas pedagógicas generales.)"
+        } else {
+            let full = resources.map { "### \($0.title)\n\($0.content)" }.joined(separator: "\n\n---\n\n")
+            combinedMaterial = String(full.prefix(4_500))
+        }
+
+        onProgress?(GenerationProgress(completedChunks: 0, totalChunks: 1))
+
+        let instructions = Instructions {
+            "Eres un docente que redacta materiales de estudio claros en español."
+            "Tu objetivo es crear RECURSOS (apuntes) que ayuden a cerrar lagunas concretas del estudiante."
+            "REGLAS:"
+            "1. Basa el contenido en el MATERIAL DE REFERENCIA. No inventes hechos ni citas que no aparezcan o no se deduzcan del texto."
+            "2. Cada recurso debe atacar al menos una laguna de la lista; indica en gapConcept cuál."
+            "3. Tono didáctico: definición → intuición → error típico → ejemplo breve (del material)."
+            "4. Usa Markdown con ## para secciones y listas donde mejore la lectura."
+            "5. Si varias lagunas están relacionadas, puedes fusionarlas en un solo recurso, pero prioriza claridad."
+        }
+
+        let session = LanguageModelSession(instructions: instructions)
+        let prompt = """
+        RECURSOS DEL ESTUDIO (títulos):
+        \(resourceList)
+
+        LAGUNAS DE CONOCIMIENTO A REFORZAR:
+        \(conceptList)
+
+        MATERIAL DE REFERENCIA (prioridad para el contenido):
+        \(combinedMaterial)
+
+        Genera entre 1 y 5 recursos de apuntes. Si hay varias lagunas, intenta cubrir las más críticas primero (mayor tasa de error).
+        """
+
+        let drafts = try await executeGeneration(tag: "generateGapResources") {
+            try await session.respond(to: prompt, generating: GeneratedGapResourcePack.self)
+        } transform: { response in
+            response.content.resources.compactMap { mapGeneratedGapResourceItem($0) }
+        }
+
+        onProgress?(GenerationProgress(completedChunks: 1, totalChunks: 1))
+        fmLog("generateGapResources", "✅ \(drafts.count) recurso(s) generado(s)")
+        return drafts
+    }
+
+    private static func mapGeneratedGapResourceItem(_ item: GeneratedGapResourceItem) -> GeneratedGapResourceDraft? {
+        let t = item.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let c = item.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let g = item.gapConcept.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard t.count >= 3, c.count >= 80 else { return nil }
+        return GeneratedGapResourceDraft(
+            title: t,
+            content: c,
+            gapConcept: g.isEmpty ? String(t.prefix(48)) : g,
+            isIncluded: true
+        )
+    }
+
     // MARK: - Evaluación
 
     static func evaluateStudentAnswer(
@@ -699,21 +786,28 @@ enum IntelligentStudyAssistant {
             }
         }
 
+        if cardType == .open, let canned = AnswerEvaluationService.openAnswerIfClearlyNonAttempt(userAnswer: userAnswer) {
+            fmLog("evaluateAnswer", "→ canned non-attempt (sin IA)")
+            return canned
+        }
+
         let rawNeeds = UserDefaults.standard.string(forKey: "accessibilityNeeds") ?? ""
         let needs = Set(rawNeeds.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
 
         let instructions = Instructions {
-            "Eres un tutor benevolente que evalúa respuestas de estudio en español."
-            "PRINCIPIO FUNDAMENTAL: evalúas si el estudiante COMPRENDE el concepto, no si memorizó la redacción exacta."
-            "REGLA isCorrect=true: cualquier respuesta que demuestre comprensión del concepto central, aunque sea breve, incompleta, informal o parafraseada. En caso de duda, marca isCorrect=true."
-            "REGLA isCorrect=false: SOLO si la respuesta contiene un error conceptual activo (afirma algo incorrecto) o es completamente irrelevante a la pregunta. Una respuesta corta o superficial NO es incorrecta."
-            "JERARQUÍA DE EVALUACIÓN:"
-            "1. ¿La respuesta afirma algo claramente erróneo? → isCorrect=false, errorTypeToken=conceptual o confusion."
-            "2. ¿La respuesta es correcta pero le faltan ideas clave? → isCorrect=true, errorTypeToken=incompleto, lista missingConcepts."
-            "3. ¿La respuesta es correcta y completa? → isCorrect=true, errorTypeToken vacío."
-            "El feedback siempre debe ser constructivo y en español. Si es correcto, refuerza lo que hizo bien. Si es incompleto, explica qué faltó. Si es incorrecto, corrige con amabilidad."
+            "Eres un tutor justo que evalúa respuestas de estudio en español."
+            "Evalúas si el estudiante demuestra comprensión del tema de la pregunta, no si copió la redacción modelo."
+            "CRÍTICO — respuestas que NO cuentan como intento válido: texto sin relación con la pregunta, broma, relleno, slang evasivo (p. ej. \"nvm\", \"random\", \"lo que sea\"), o negaciones sin explicar (p. ej. solo \"no sé\" / \"ni idea\" sin ningún contenido sobre el tema). En todos esos casos: isCorrect=false, errorTypeToken=conceptual (o confusion si aplica), NUNCA uses incompleto."
+            "incompleto SOLO cuando isCorrect=true: la respuesta SÍ trata el tema de la pregunta pero le faltan matices o ideas importantes. Si no trata el tema, no es incompleto — es incorrecta."
+            "JERARQUÍA DE EVALUACIÓN (aplica en este orden):"
+            "0. ¿La respuesta ignora el enunciado, es irrelevante o es evasiva sin sustancia? → isCorrect=false, errorTypeToken=conceptual."
+            "1. ¿Afirma algo claramente erróneo sobre el tema? → isCorrect=false, errorTypeToken=conceptual o confusion."
+            "2. ¿Aborda el tema y es razonablemente correcta pero le faltan ideas clave? → isCorrect=true, errorTypeToken=incompleto, missingConcepts."
+            "3. ¿Aborda el tema y es adecuada? → isCorrect=true, errorTypeToken vacío."
+            "Si dudas entre \"no intentó responder\" e \"incompleto\", elige \"no intentó\" (isCorrect=false). Sé exigente con la relevancia."
+            "El feedback siempre constructivo y en español: si es incorrecta o irrelevante, di con claridad que debe responder al contenido de la pregunta."
             if needs.contains("adhd") {
-                "IMPORTANTE (TDAH): el feedback debe ser breve, directo y comenzar reconociendo lo que el estudiante hizo bien antes de señalar errores."
+                "IMPORTANTE (TDAH): el feedback breve y directo. Si la respuesta sí aborda el tema, puedes empezar con algo que hizo bien. Si es irrelevante o evasiva, no inventes elogios: di qué se pedía y anima a intentarlo."
             }
             if needs.contains("autism") {
                 "IMPORTANTE (Autismo): usa lenguaje directo y concreto. Evita metáforas, sarcasmo o lenguaje ambiguo. Di exactamente qué faltó."
@@ -734,6 +828,8 @@ enum IntelligentStudyAssistant {
         Respuesta modelo: \(correctAnswer)
         \(optText)
         Respuesta del estudiante: \(userAnswer ?? "")
+
+        Criterio: si la respuesta no intenta responder al tema de la pregunta (irrelevante, evasiva o sin sustancia), isCorrect=false; no uses "incompleto" salvo que sí aborde el tema pero le falte profundidad.
         """
 
         fmLog("evaluateAnswer", "→ prompt=\(prompt.count)chars")
@@ -744,7 +840,11 @@ enum IntelligentStudyAssistant {
             fmLog("evaluateAnswer", "✅ isCorrect=\(response.content.isCorrect)")
             let ev = response.content
 
-            let errToken = ev.errorTypeToken.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            var errToken = ev.errorTypeToken.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            // Coherencia: "incompleto" solo con respuestas marcadas como correctas.
+            if errToken == ErrorType.incompleto.rawValue, !ev.isCorrect {
+                errToken = ErrorType.conceptual.rawValue
+            }
             let mappedError: ErrorType? = errToken.isEmpty ? nil : ErrorType(rawValue: errToken)
 
             return CreateAttemptDto(

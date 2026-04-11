@@ -72,3 +72,13 @@ struct EditableFlashcard: Identifiable {
         )
     }
 }
+
+/// Borrador de recurso generado por IA a partir de lagunas (revisión antes de guardar).
+struct GeneratedGapResourceDraft: Identifiable {
+    let id = UUID()
+    var title: String
+    var content: String
+    /// Tema / laguna que cubre (metadato para la revisión).
+    var gapConcept: String
+    var isIncluded: Bool = true
+}

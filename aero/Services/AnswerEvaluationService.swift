@@ -3,6 +3,48 @@ import Foundation
 /// Evaluación on-device (sustituto/heurística hasta conectar Foundation Models).
 /// Produce un `CreateAttemptDto` listo para `POST /flashcards/:id/attempts`.
 enum AnswerEvaluationService {
+
+    /// Respuestas abiertas que no intentan contestar (slang, relleno). Misma lógica con o sin Apple Intelligence.
+    static func openAnswerIfClearlyNonAttempt(userAnswer: String?) -> CreateAttemptDto? {
+        guard let raw = userAnswer?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }
+        let folded = raw.folding(options: .diacriticInsensitive, locale: Locale(identifier: "es"))
+            .lowercased()
+        let stripped = folded.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters))
+
+        let exactJunk: Set<String> = [
+            "nvm", "nm", "idk", "idc", "lol", "lmao", "lmfao", "rofl", "meh", "nah", "yolo",
+            "ok", "okay", "k", "kk", "jaja", "jeje", "xd", "xp",
+            "random", "asd", "asdf", "qwerty", "test", "prueba", "foo", "bar",
+            "skip", "pass", "nope", "whatevs", "whatever", "idfk", "idek",
+            "no se", "nose", "ni idea", "paso", "next", "bye", "chau"
+        ]
+        if exactJunk.contains(stripped) {
+            return CreateAttemptDto(
+                userAnswer: userAnswer,
+                isCorrect: false,
+                errorType: .conceptual,
+                missingConcepts: [],
+                incorrectConcepts: [],
+                feedback: "Esta respuesta no aborda la pregunta. Intenta explicar el concepto con tus palabras.",
+                confidenceScore: 0.98
+            )
+        }
+
+        if stripped.count >= 2, stripped.count <= 12, Set(stripped).count == 1 {
+            return CreateAttemptDto(
+                userAnswer: userAnswer,
+                isCorrect: false,
+                errorType: .conceptual,
+                missingConcepts: [],
+                incorrectConcepts: [],
+                feedback: "Escribe una respuesta que se relacione con lo que se te pregunta.",
+                confidenceScore: 0.95
+            )
+        }
+
+        return nil
+    }
+
     static func evaluate(
         question: String,
         correctAnswer: String,
@@ -39,6 +81,10 @@ enum AnswerEvaluationService {
         correctAnswer: String,
         userAnswer: String
     ) -> CreateAttemptDto {
+        if let nonAttempt = openAnswerIfClearlyNonAttempt(userAnswer: userAnswer) {
+            return nonAttempt
+        }
+
         let user = normalize(userAnswer)
         let correct = normalize(correctAnswer)
 

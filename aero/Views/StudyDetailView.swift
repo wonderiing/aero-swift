@@ -41,6 +41,11 @@ struct StudyDetailView: View {
                 selectedTab = 1
             }
         }
+        .sheet(isPresented: $viewModel.showingGenerateResourcesFromGaps) {
+            GenerateResourcesFromGapsSheet(viewModel: viewModel) {
+                selectedTab = 0
+            }
+        }
         .fullScreenCover(isPresented: $showingAnkiSession) { AnkiSessionView(viewModel: viewModel) }
         .onAppear {
             viewModel.modelContext = modelContext
@@ -486,7 +491,7 @@ struct ResourceCardView: View {
                         .font(isLargeCanvas ? .title3 : .headline)
                         .foregroundStyle(titleInk)
                         .lineLimit(1)
-                    Text(resource.content)
+                    Text(Self.previewLine(from: resource.content))
                         .font(isLargeCanvas ? .callout : .caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(isLargeCanvas ? 3 : 2)
@@ -502,6 +507,16 @@ struct ResourceCardView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private static func previewLine(from markdown: String) -> String {
+        let plain = AeroMarkdown.plainText(from: markdown)
+        let oneLine = plain.replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if oneLine.count > 220 {
+            return String(oneLine.prefix(220)) + "…"
+        }
+        return oneLine
     }
 
     private var metaLine: String {
@@ -1012,32 +1027,61 @@ struct ProgressTab: View {
 
                         // Refuerzo: misma lista que usa la IA (`reinforcementGaps`: examen, fallback por tarjeta o Anki).
                         if !viewModel.reinforcementGaps.isEmpty {
-                            Button {
-                                viewModel.showingGenerateFromGaps = true
-                            } label: {
-                                AeroSurfaceCard {
-                                    HStack(spacing: 14) {
-                                        ZStack {
-                                            Circle()
-                                                .fill(LinearGradient(colors: [.orange, .red],
-                                                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-                                                .frame(width: 46, height: 46)
-                                            Image(systemName: "wand.and.stars").font(.title3).foregroundStyle(.white)
+                            VStack(spacing: 10) {
+                                Button {
+                                    viewModel.showingGenerateFromGaps = true
+                                } label: {
+                                    AeroSurfaceCard {
+                                        HStack(spacing: 14) {
+                                            ZStack {
+                                                Circle()
+                                                    .fill(LinearGradient(colors: [.orange, .red],
+                                                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+                                                    .frame(width: 46, height: 46)
+                                                Image(systemName: "wand.and.stars").font(.title3).foregroundStyle(.white)
+                                            }
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text("Generar tarjetas de refuerzo")
+                                                    .font(isLargeCanvas ? .subheadline : .callout)
+                                                    .fontWeight(.semibold).foregroundStyle(.primary)
+                                                Text("La IA creará preguntas sobre tus \(viewModel.reinforcementGaps.count) concepto\(viewModel.reinforcementGaps.count == 1 ? "" : "s") a reforzar")
+                                                    .font(.caption2).foregroundStyle(.secondary)
+                                            }
+                                            Spacer()
+                                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.orange)
                                         }
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            Text("Generar tarjetas de refuerzo")
-                                                .font(isLargeCanvas ? .subheadline : .callout)
-                                                .fontWeight(.semibold).foregroundStyle(.primary)
-                                            Text("La IA creará preguntas sobre tus \(viewModel.reinforcementGaps.count) concepto\(viewModel.reinforcementGaps.count == 1 ? "" : "s") a reforzar")
-                                                .font(.caption2).foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.orange)
                                     }
                                 }
+                                .buttonStyle(.plain)
+                                .disabled(viewModel.resources.isEmpty)
+
+                                Button {
+                                    viewModel.showingGenerateResourcesFromGaps = true
+                                } label: {
+                                    AeroSurfaceCard {
+                                        HStack(spacing: 14) {
+                                            ZStack {
+                                                Circle()
+                                                    .fill(LinearGradient(colors: [Color.aeroNavy, Color.aeroNavy.opacity(0.75)],
+                                                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+                                                    .frame(width: 46, height: 46)
+                                                Image(systemName: "doc.text.fill").font(.title3).foregroundStyle(.white)
+                                            }
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text("Generar recursos de estudio")
+                                                    .font(isLargeCanvas ? .subheadline : .callout)
+                                                    .fontWeight(.semibold).foregroundStyle(.primary)
+                                                Text("Apuntes con IA según tus lagunas; se guardan en Recursos.")
+                                                    .font(.caption2).foregroundStyle(.secondary)
+                                            }
+                                            Spacer()
+                                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(Color.aeroNavy.opacity(0.8))
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(viewModel.resources.isEmpty)
                             }
-                            .buttonStyle(.plain)
-                            .disabled(viewModel.resources.isEmpty)
                         }
                     }
                     .padding(.horizontal, isLargeCanvas ? 24 : 16)
@@ -1601,6 +1645,268 @@ struct GenerateFromGapsSheet: View {
             generationError = error.localizedDescription
             isGenerating = false
         }
+    }
+}
+
+// MARK: - Generate resources from gaps
+
+struct GenerateResourcesFromGapsSheet: View {
+    @ObservedObject var viewModel: StudyDetailViewModel
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    var onResourcesSaved: (() -> Void)?
+
+    @State private var drafts: [GeneratedGapResourceDraft] = []
+    @State private var navigateReview = false
+    @State private var isGenerating = false
+    @State private var generationError: String?
+    @State private var generationProgress: CGFloat = 0
+    @State private var generationStatus = "Preparando..."
+
+    private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
+    private var typeScale: AeroTypeScale { AeroTypeScale.make(isLargeCanvas: isLargeCanvas) }
+
+    private var gaps: [ConceptGap] { viewModel.reinforcementGaps }
+
+    init(viewModel: StudyDetailViewModel, onResourcesSaved: (() -> Void)? = nil) {
+        self.viewModel = viewModel
+        self.onResourcesSaved = onResourcesSaved
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                AeroAppBackground()
+
+                ScrollView {
+                    VStack(spacing: 16) {
+                        AeroSurfaceCard {
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "doc.text.fill")
+                                        .font(.title3)
+                                        .foregroundStyle(Color.aeroNavy)
+                                    Text("Recursos de refuerzo")
+                                        .font(.headline)
+                                }
+                                Text("La IA redactará apuntes enfocados en tus lagunas, usando tus recursos como base. Podrás revisarlos antes de guardarlos.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        if gaps.isEmpty {
+                            AeroSurfaceCard {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "checkmark.seal.fill")
+                                        .font(.largeTitle).foregroundStyle(.green)
+                                    Text("¡Sin lagunas detectadas!")
+                                        .font(.headline)
+                                    Text("Practica más para que el análisis detecte conceptos a reforzar.")
+                                        .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                            }
+                        } else {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Lagunas consideradas (\(min(gaps.count, 5)))")
+                                    .font(.headline)
+                                    .padding(.horizontal, 2)
+                                ForEach(gaps.prefix(5)) { gap in
+                                    AeroSurfaceCard {
+                                        HStack(spacing: 12) {
+                                            Text("\(Int(gap.error_rate * 100))%")
+                                                .font(.caption).fontWeight(.bold).foregroundStyle(.orange)
+                                                .frame(width: 36)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(gap.concept.capitalized)
+                                                    .font(.subheadline).fontWeight(.medium)
+                                            }
+                                            Spacer()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if let generationError {
+                            AeroSurfaceCard {
+                                HStack(alignment: .top, spacing: 10) {
+                                    Image(systemName: "xmark.octagon.fill").foregroundStyle(.red)
+                                    Text(generationError).font(.subheadline).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, isLargeCanvas ? 24 : 16)
+                    .padding(.vertical, 12)
+                }
+                .allowsHitTesting(!isGenerating)
+                .blur(radius: isGenerating ? 3 : 0)
+
+                if isGenerating {
+                    Color.black.opacity(0.15)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                    GenerationProgressOverlay(
+                        progress: generationProgress,
+                        statusText: generationStatus,
+                        typeScale: typeScale
+                    )
+                    .transition(.scale(scale: 0.85).combined(with: .opacity))
+                }
+            }
+            .navigationTitle("Recursos desde lagunas")
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                viewModel.fetchContent()
+                IntelligentStudyAssistant.prewarm()
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cerrar") { dismiss() }.disabled(isGenerating)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        Task { await runGeneration() }
+                    } label: {
+                        Label("Generar", systemImage: "sparkles")
+                    }
+                    .disabled(gaps.isEmpty || viewModel.resources.isEmpty || isGenerating)
+                }
+            }
+            .navigationDestination(isPresented: $navigateReview) {
+                ReviewGeneratedGapResourcesView(
+                    viewModel: viewModel,
+                    drafts: $drafts,
+                    onFinish: {
+                        navigateReview = false
+                        onResourcesSaved?()
+                        dismiss()
+                    }
+                )
+            }
+        }
+    }
+
+    private func runGeneration() async {
+        isGenerating = true
+        generationError = nil
+        generationProgress = 0.05
+        generationStatus = "Leyendo material..."
+
+        let payload = viewModel.resources.map { (id: $0.id, title: $0.title, content: $0.content) }
+
+        do {
+            let result = try await IntelligentStudyAssistant.generateResourcesFromGaps(
+                gaps: gaps,
+                resources: payload,
+                onProgress: { progress in
+                    Task { @MainActor in
+                        let total = max(1, progress.totalChunks)
+                        let chunk = Double(progress.completedChunks) / Double(total)
+                        generationProgress = CGFloat(0.05 + 0.85 * chunk)
+                        generationStatus = progress.completedChunks < total ? "Redactando apuntes..." : "Finalizando..."
+                    }
+                }
+            )
+            generationProgress = 1.0
+            generationStatus = "¡Listo!"
+            try? await Task.sleep(for: .milliseconds(400))
+            drafts = result
+            isGenerating = false
+            if result.isEmpty {
+                generationError = "No se generaron recursos. Comprueba que tus recursos tengan texto suficiente."
+            } else {
+                navigateReview = true
+            }
+        } catch {
+            generationError = error.localizedDescription
+            isGenerating = false
+        }
+    }
+}
+
+private struct ReviewGeneratedGapResourcesView: View {
+    @ObservedObject var viewModel: StudyDetailViewModel
+    @Binding var drafts: [GeneratedGapResourceDraft]
+    var onFinish: () -> Void
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
+
+    var body: some View {
+        ZStack {
+            AeroAppBackground()
+
+            List {
+                if let errorMessage {
+                    Section {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
+                            Text(errorMessage).font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        .listRowBackground(Color.clear)
+                    }
+                }
+
+                ForEach($drafts) { $item in
+                    Section {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text(item.gapConcept)
+                                    .font(.caption).foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                                Spacer()
+                                Toggle("Incluir", isOn: $item.isIncluded)
+                                    .labelsHidden()
+                                    .tint(Color.aeroNavy)
+                            }
+                            TextField("Título", text: $item.title)
+                                .font(.headline)
+                            TextEditor(text: $item.content)
+                                .frame(minHeight: isLargeCanvas ? 200 : 160)
+                                .scrollContentBackground(.hidden)
+                                .padding(8)
+                                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                .onDelete { drafts.remove(atOffsets: $0) }
+            }
+            .scrollContentBackground(.hidden)
+            .listStyle(.insetGrouped)
+        }
+        .navigationTitle("Revisar recursos")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Guardar en Recursos") {
+                    saveBatch()
+                }
+                .disabled(isSaving)
+            }
+        }
+    }
+
+    private func saveBatch() {
+        isSaving = true
+        errorMessage = nil
+        let included = drafts.filter(\.isIncluded)
+        guard !included.isEmpty else {
+            errorMessage = "Incluye al menos un recurso."
+            isSaving = false
+            return
+        }
+        viewModel.saveGapResourceBatch(included)
+        isSaving = false
+        onFinish()
     }
 }
 

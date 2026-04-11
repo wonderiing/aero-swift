@@ -8,6 +8,7 @@ struct ResourceDetailView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var title: String = ""
     @State private var content: String = ""
+    @State private var isEditingBody = false
     @State private var errorMessage: String?
     @State private var showDiscardAlert = false
 
@@ -54,17 +55,39 @@ struct ResourceDetailView: View {
                                     .font(.subheadline)
                                     .fontWeight(.medium)
                                 Spacer()
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        isEditingBody.toggle()
+                                    }
+                                } label: {
+                                    Text(isEditingBody ? "Ver formato" : "Editar texto")
+                                        .font(.caption.weight(.semibold))
+                                }
+                                .buttonStyle(.bordered)
                                 Text("\(content.count) caracteres")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                                     .monospacedDigit()
                             }
-                            TextEditor(text: $content)
-                                .frame(minHeight: 600)
-                                .scrollDisabled(true)
-                                .padding(8)
+                            if isEditingBody {
+                                TextEditor(text: $content)
+                                    .frame(minHeight: 600)
+                                    .scrollDisabled(true)
+                                    .padding(8)
+                                    .background(Color.aeroSecondaryBackground.opacity(0.8))
+                                    .clipShape(.rect(cornerRadius: 12))
+                            } else {
+                                ScrollView {
+                                    AeroMarkdownText(markdown: content)
+                                        .font(.body)
+                                        .textSelection(.enabled)
+                                        .padding(12)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .frame(minHeight: 400)
                                 .background(Color.aeroSecondaryBackground.opacity(0.8))
                                 .clipShape(.rect(cornerRadius: 12))
+                            }
                         }
                     }
 

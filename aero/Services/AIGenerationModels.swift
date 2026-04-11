@@ -58,10 +58,14 @@ struct GeneratedFlashcardItem {
 
 @Generable(description: "Evaluación de la respuesta del estudiante")
 struct GeneratedAnswerEvaluation {
-    @Guide(description: "true si el estudiante demuestra comprensión del concepto central, aunque la respuesta sea breve, informal o incompleta. false SOLO si la respuesta contiene un error conceptual activo o es completamente irrelevante.")
+    @Guide(description: """
+    true solo si la respuesta muestra comprensión sustantiva del tema de la pregunta (aunque sea breve o informal).
+    false si: (a) ignora el enunciado o es irrelevante/evasiva; (b) es texto aleatorio, broma o slang sin contenido (p. ej. "nvm", "random", "no sé" sin desarrollar); (c) error conceptual.
+    NO marques true por ser "amable": una respuesta que no trata el tema es false, no "incompleto".
+    """)
     var isCorrect: Bool
 
-    @Guide(description: "Usa 'incompleto' cuando isCorrect=true pero faltan ideas clave. Usa 'conceptual', 'memoria' o 'confusion' cuando isCorrect=false. Deja vacío si la respuesta es totalmente correcta.")
+    @Guide(description: "Usa 'incompleto' SOLO cuando isCorrect=true y la respuesta SÍ aborda el tema pero faltan ideas clave. NUNCA uses 'incompleto' si isCorrect=false. Para evasivas o fuera de tema usa 'conceptual' o 'confusion'. Deja vacío si la respuesta es totalmente correcta.")
     var errorTypeToken: String
 
     @Guide(description: "Solo cuando errorTypeToken='incompleto': lista de conceptos o ideas que el estudiante no mencionó pero eran relevantes.", .maximumCount(4))
@@ -120,4 +124,28 @@ struct GeneratedAnkiItem {
 struct ConceptDeepExplanation {
     @Guide(description: "Explicación más profunda en español, sin inventar fuera del contexto dado")
     var text: String
+}
+
+// MARK: - Recursos de refuerzo por lagunas
+
+@Generable(description: "Apuntes de estudio para corregir lagunas de conocimiento")
+struct GeneratedGapResourcePack {
+    @Guide(description: "Entre 1 y 5 recursos: prioriza uno por laguna distinta cuando haya varias", .minimumCount(1), .maximumCount(5))
+    var resources: [GeneratedGapResourceItem]
+}
+
+@Generable
+struct GeneratedGapResourceItem {
+    @Guide(description: "Título breve y descriptivo (máximo 70 caracteres)")
+    var title: String
+
+    @Guide(description: """
+    Contenido en Markdown (## secciones, listas con guiones, **negritas**).
+    Explica el concepto, por qué suele fallarse y un ejemplo breve tomado del material.
+    Entre 200 y 900 palabras. No cites fuentes externas ni inventes datos fuera del material.
+    """)
+    var content: String
+
+    @Guide(description: "Qué laguna cubre (palabras clave tomadas de la lista LAGUNAS)")
+    var gapConcept: String
 }
