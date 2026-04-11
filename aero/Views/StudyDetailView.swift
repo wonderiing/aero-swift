@@ -36,7 +36,11 @@ struct StudyDetailView: View {
         .sheet(isPresented: $viewModel.showingGenerateFlashcards) { GenerateFlashcardsSheet(viewModel: viewModel) }
         .sheet(isPresented: $viewModel.showingGenerateAnkiCards) { GenerateAnkiCardsSheet(viewModel: viewModel) }
         .sheet(isPresented: $viewModel.showingCreateFlashcardManual) { CreateFlashcardManualView(viewModel: viewModel) }
-        .sheet(isPresented: $viewModel.showingGenerateFromGaps) { GenerateFromGapsSheet(viewModel: viewModel) }
+        .sheet(isPresented: $viewModel.showingGenerateFromGaps) {
+            GenerateFromGapsSheet(viewModel: viewModel) {
+                selectedTab = 1
+            }
+        }
         .fullScreenCover(isPresented: $showingAnkiSession) { AnkiSessionView(viewModel: viewModel) }
         .onAppear {
             viewModel.modelContext = modelContext
@@ -963,32 +967,6 @@ struct ProgressTab: View {
                                 ForEach(gaps.gaps) { gap in
                                     GapCardView(gap: gap, isLargeCanvas: isLargeCanvas)
                                 }
-                                Button {
-                                    viewModel.showingGenerateFromGaps = true
-                                } label: {
-                                    AeroSurfaceCard {
-                                        HStack(spacing: 14) {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(LinearGradient(colors: [.orange, .red],
-                                                                         startPoint: .topLeading, endPoint: .bottomTrailing))
-                                                    .frame(width: 46, height: 46)
-                                                Image(systemName: "wand.and.stars").font(.title3).foregroundStyle(.white)
-                                            }
-                                            VStack(alignment: .leading, spacing: 3) {
-                                                Text("Generar tarjetas de refuerzo")
-                                                    .font(isLargeCanvas ? .subheadline : .callout)
-                                                    .fontWeight(.semibold).foregroundStyle(.primary)
-                                                Text("La IA creará preguntas de examen sobre tus \(gaps.gaps.count) laguna\(gaps.gaps.count == 1 ? "" : "s")")
-                                                    .font(.caption2).foregroundStyle(.secondary)
-                                            }
-                                            Spacer()
-                                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.orange)
-                                        }
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(viewModel.resources.isEmpty)
                             }
 
                             if !gaps.strongConcepts.isEmpty {
@@ -1030,6 +1008,36 @@ struct ProgressTab: View {
                                     StrongConceptCardView(concept: concept)
                                 }
                             }
+                        }
+
+                        // Refuerzo: misma lista que usa la IA (`reinforcementGaps`: examen, fallback por tarjeta o Anki).
+                        if !viewModel.reinforcementGaps.isEmpty {
+                            Button {
+                                viewModel.showingGenerateFromGaps = true
+                            } label: {
+                                AeroSurfaceCard {
+                                    HStack(spacing: 14) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(LinearGradient(colors: [.orange, .red],
+                                                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                                                .frame(width: 46, height: 46)
+                                            Image(systemName: "wand.and.stars").font(.title3).foregroundStyle(.white)
+                                        }
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text("Generar tarjetas de refuerzo")
+                                                .font(isLargeCanvas ? .subheadline : .callout)
+                                                .fontWeight(.semibold).foregroundStyle(.primary)
+                                            Text("La IA creará preguntas sobre tus \(viewModel.reinforcementGaps.count) concepto\(viewModel.reinforcementGaps.count == 1 ? "" : "s") a reforzar")
+                                                .font(.caption2).foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.orange)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(viewModel.resources.isEmpty)
                         }
                     }
                     .padding(.horizontal, isLargeCanvas ? 24 : 16)
@@ -1406,17 +1414,27 @@ struct GenerateFromGapsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
+    /// Tras guardar desde la revisión (p. ej. ir a la pestaña Flashcards / Anki).
+    var onCardsSaved: (() -> Void)?
+
     @State private var drafts: [EditableFlashcard] = []
     @State private var navigateReview = false
     @State private var isGenerating = false
     @State private var generationError: String?
-    @State private var generationProgress: Double = 0
+    @State private var generationProgress: CGFloat = 0
     @State private var generationStatus = "Preparando..."
 
     private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
+    private var typeScale: AeroTypeScale { AeroTypeScale.make(isLargeCanvas: isLargeCanvas) }
 
+    /// Misma lógica que `GapAnalysis.reinforcementGaps`: examen agregado, fallback por fallos, o Anki.
     private var gaps: [ConceptGap] {
-        viewModel.gapAnalysis?.gaps ?? []
+        viewModel.reinforcementGaps
+    }
+
+    init(viewModel: StudyDetailViewModel, onCardsSaved: (() -> Void)? = nil) {
+        self.viewModel = viewModel
+        self.onCardsSaved = onCardsSaved
     }
 
     var body: some View {
@@ -1503,31 +1521,21 @@ struct GenerateFromGapsSheet: View {
                 .blur(radius: isGenerating ? 3 : 0)
 
                 if isGenerating {
-                    Color.black.opacity(0.12).ignoresSafeArea().transition(.opacity)
-                    VStack(spacing: 20) {
-                        ProgressView(value: generationProgress) {
-                            Text(generationStatus)
-                                .font(.subheadline).fontWeight(.medium)
-                        }
-                        .progressViewStyle(.circular)
-                        .scaleEffect(1.5)
-                        .padding(.bottom, 8)
-                        Text(generationStatus)
-                            .font(.subheadline).foregroundStyle(.secondary)
-                        Text("\(Int(generationProgress * 100))%")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    .padding(32)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(.ultraThinMaterial)
-                            .shadow(color: .black.opacity(0.1), radius: 16, y: 8)
+                    Color.black.opacity(0.15)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+
+                    GenerationProgressOverlay(
+                        progress: generationProgress,
+                        statusText: generationStatus,
+                        typeScale: typeScale
                     )
-                    .transition(.scale(scale: 0.9).combined(with: .opacity))
+                    .transition(.scale(scale: 0.85).combined(with: .opacity))
                 }
             }
             .navigationTitle("Generar desde lagunas")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear { viewModel.fetchContent() }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cerrar") { dismiss() }.disabled(isGenerating)
@@ -1547,8 +1555,10 @@ struct GenerateFromGapsSheet: View {
                     drafts: $drafts,
                     onFinish: {
                         navigateReview = false
+                        onCardsSaved?()
                         dismiss()
-                    }
+                    },
+                    alsoSaveAsAnkiCards: true
                 )
             }
         }
@@ -1569,7 +1579,8 @@ struct GenerateFromGapsSheet: View {
                 onProgress: { progress in
                     Task { @MainActor in
                         let total = max(1, progress.totalChunks)
-                        generationProgress = 0.05 + 0.85 * (Double(progress.completedChunks) / Double(total))
+                        let chunk = Double(progress.completedChunks) / Double(total)
+                        generationProgress = CGFloat(0.05 + 0.85 * chunk)
                         generationStatus = progress.completedChunks < total
                             ? "Generando parte \(progress.completedChunks + 1) de \(total)..."
                             : "Finalizando..."
