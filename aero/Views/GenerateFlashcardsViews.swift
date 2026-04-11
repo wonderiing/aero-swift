@@ -9,7 +9,7 @@ private enum AeroLayout {
     static let cardCornerRadius: CGFloat = 18
 }
 
-fileprivate struct AeroTypeScale {
+struct AeroTypeScale {
     let title: Font
     let sectionHeader: Font
     let body: Font
@@ -184,7 +184,7 @@ private struct ResourceSelectionRow: View {
 
 // MARK: - Generation Progress Overlay
 
-fileprivate struct GenerationProgressOverlay: View {
+struct GenerationProgressOverlay: View {
     let progress: CGFloat
     let statusText: String
     let typeScale: AeroTypeScale
@@ -658,6 +658,8 @@ struct ReviewGeneratedFlashcardsView: View {
     @ObservedObject var viewModel: StudyDetailViewModel
     @Binding var drafts: [EditableFlashcard]
     var onFinish: () -> Void
+    /// Cuando es true (p. ej. lagunas), además guarda frente/dorso en la pestaña Flashcards (Anki).
+    var alsoSaveAsAnkiCards: Bool = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var isSaving = false
@@ -763,8 +765,34 @@ struct ReviewGeneratedFlashcardsView: View {
             return
         }
         viewModel.saveFlashcardBatch(included.map { $0.toDto() })
+        if alsoSaveAsAnkiCards {
+            let ankiDrafts = included.map { card -> EditableAnkiCard in
+                EditableAnkiCard(
+                    resourceId: card.resourceId,
+                    front: card.question,
+                    back: ankiBackText(from: card),
+                    tags: card.conceptTags,
+                    isIncluded: true
+                )
+            }
+            viewModel.saveAnkiCardBatch(ankiDrafts)
+        }
         isSaving = false
         onFinish()
+    }
+
+    private func ankiBackText(from card: EditableFlashcard) -> String {
+        switch card.type {
+        case .open:
+            return card.answer
+        case .multipleChoice:
+            guard let opts = card.options else { return card.answer }
+            let dist = opts.distractors.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            if dist.isEmpty {
+                return "Respuesta correcta: \(opts.correct)"
+            }
+            return "Respuesta correcta: \(opts.correct)\n\nOpciones: " + ([opts.correct] + dist).joined(separator: " · ")
+        }
     }
 }
 

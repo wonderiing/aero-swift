@@ -285,18 +285,50 @@ struct GapAnalysis {
     let ankiGaps: [ConceptGap]
     let ankiStrongConcepts: [StrongConcept]
 
+    private static func shortQuestionLabel(_ question: String) -> String {
+        let t = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.isEmpty { return "Sin pregunta" }
+        return t.count > 72 ? String(t.prefix(69)) + "…" : t
+    }
+
     static func compute(flashcards: [SDFlashcard], ankiCards: [SDAnkiCard] = []) -> GapAnalysis {
-        var conceptStats: [String: (total: Int, errors: Int, lastSeen: Date?, errorTypes: [ErrorType])] = [:]
+        /// Agregación por etiqueta de concepto o, si no hay etiquetas, por tarjeta (una laguna por pregunta).
+        struct ConceptAgg {
+            var displayLabel: String
+            var total: Int
+            var errors: Int
+            var lastSeen: Date?
+            var errorTypes: [ErrorType]
+        }
+
+        var conceptStats: [String: ConceptAgg] = [:]
         var errorTypeCounts: [ErrorType: Int] = [:]
 
         for card in flashcards {
-            for attempt in card.attempts {
+            let attempts = card.attempts
+            guard !attempts.isEmpty else { continue }
+
+            let bucketKeys: [(key: String, label: String)] = {
+                if !card.conceptTags.isEmpty {
+                    return card.conceptTags.map { ($0.lowercased(), $0) }
+                }
+                let label = Self.shortQuestionLabel(card.question)
+                return [(card.id.uuidString, label)]
+            }()
+
+            for attempt in attempts {
                 if !attempt.isCorrect, let et = attempt.errorType {
                     errorTypeCounts[et, default: 0] += 1
                 }
-                for tag in card.conceptTags {
-                    let key = tag.lowercased()
-                    var stat = conceptStats[key] ?? (0, 0, nil, [])
+
+                for (aggKey, label) in bucketKeys {
+                    var stat = conceptStats[aggKey] ?? ConceptAgg(
+                        displayLabel: label,
+                        total: 0,
+                        errors: 0,
+                        lastSeen: nil,
+                        errorTypes: []
+                    )
                     stat.total += 1
                     if !attempt.isCorrect {
                         stat.errors += 1
@@ -305,7 +337,8 @@ struct GapAnalysis {
                     if stat.lastSeen == nil || attempt.answeredAt > stat.lastSeen! {
                         stat.lastSeen = attempt.answeredAt
                     }
-                    conceptStats[key] = stat
+                    stat.displayLabel = label
+                    conceptStats[aggKey] = stat
                 }
             }
         }
@@ -314,13 +347,15 @@ struct GapAnalysis {
         var gaps: [ConceptGap] = []
         var strong: [StrongConcept] = []
 
-        for (concept, stat) in conceptStats where stat.total >= 2 {
+        for (aggKey, stat) in conceptStats {
+            guard stat.total >= 1 else { continue }
             let errorRate = Double(stat.errors) / Double(stat.total)
             let dominantError = stat.errorTypes.isEmpty ? nil : Dictionary(grouping: stat.errorTypes, by: { $0 }).max(by: { $0.value.count < $1.value.count })?.key
 
-            if errorRate > 0.3 {
+            if stat.errors >= 1, errorRate >= 0.3 {
                 gaps.append(ConceptGap(
-                    concept: concept,
+                    id: aggKey,
+                    concept: stat.displayLabel,
                     error_rate: errorRate,
                     total_attempts: stat.total,
                     errors: stat.errors,
@@ -328,9 +363,9 @@ struct GapAnalysis {
                     trend: "estable",
                     last_seen: stat.lastSeen
                 ))
-            } else {
+            } else if stat.total >= 2, stat.errors == 0 || errorRate < 0.3 {
                 strong.append(StrongConcept(
-                    concept: concept,
+                    concept: stat.displayLabel,
                     error_rate: errorRate,
                     total_attempts: stat.total
                 ))
@@ -366,6 +401,7 @@ struct GapAnalysis {
             // Laguna: al menos 2 repasos y tasa de olvido alta
             if stat.total >= 2 && errorRate > 0.4 {
                 ankiGaps.append(ConceptGap(
+                    id: concept,
                     concept: concept,
                     error_rate: errorRate,
                     total_attempts: stat.total,
@@ -397,5 +433,47 @@ struct GapAnalysis {
             ankiGaps: ankiGaps,
             ankiStrongConcepts: ankiStrong
         )
+    }
+
+    /// Lagunas para UI y generación IA: primero el análisis estadístico; si está vacío, lista explícita
+    /// por tarjeta (etiquetas o extracto de pregunta) con al menos un fallo; si no hay examen, usa lagunas Anki.
+    static func reinforcementGaps(flashcards: [SDFlashcard], ankiCards: [SDAnkiCard] = []) -> [ConceptGap] {
+        let base = compute(flashcards: flashcards, ankiCards: ankiCards)
+        if !base.gaps.isEmpty { return base.gaps }
+
+        var fromExam: [ConceptGap] = []
+        for card in flashcards {
+            let attempts = card.attempts
+            let wrongs = attempts.filter { !$0.isCorrect }.count
+            guard wrongs >= 1 else { continue }
+            let total = max(1, attempts.count)
+            let rate = Double(wrongs) / Double(total)
+            let wrongAttempts = attempts.filter { !$0.isCorrect }
+            let errTypes = wrongAttempts.compactMap(\.errorType)
+            let dominant = errTypes.isEmpty ? nil : Dictionary(grouping: errTypes, by: { $0 }).max(by: { $0.value.count < $1.value.count })?.key
+
+            let label: String
+            let tags = card.conceptTags.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            if tags.isEmpty {
+                label = shortQuestionLabel(card.question)
+            } else {
+                label = tags.joined(separator: " · ")
+            }
+
+            fromExam.append(ConceptGap(
+                id: "exam-\(card.id.uuidString)",
+                concept: label,
+                error_rate: rate,
+                total_attempts: total,
+                errors: wrongs,
+                dominant_error_type: dominant,
+                trend: "estable",
+                last_seen: attempts.map(\.answeredAt).max()
+            ))
+        }
+        if !fromExam.isEmpty {
+            return fromExam.sorted { $0.error_rate > $1.error_rate }
+        }
+        return base.ankiGaps
     }
 }

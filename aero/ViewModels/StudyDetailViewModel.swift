@@ -12,6 +12,11 @@ final class StudyDetailViewModel: ObservableObject {
     @Published var ankiReviewQueue: [SDAnkiCard] = []
     @Published var gapAnalysis: GapAnalysis?
     @Published var isLoading = false
+
+    /// Conceptos / tarjetas con fallos para Progreso y «generar desde lagunas».
+    var reinforcementGaps: [ConceptGap] {
+        GapAnalysis.reinforcementGaps(flashcards: flashcards, ankiCards: ankiCards)
+    }
     @Published var errorMessage: String?
 
     @Published var showingAddResource = false
@@ -27,6 +32,7 @@ final class StudyDetailViewModel: ObservableObject {
 
     init(study: SDStudy) {
         self.study = study
+        self.gapAnalysis = GapAnalysis.compute(flashcards: study.flashcards, ankiCards: study.ankiCards)
     }
 
     func fetchContent() {
