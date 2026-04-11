@@ -64,6 +64,7 @@ struct StudyDetailView: View {
         VStack(spacing: 0) {
             StudyHeroHeader(
                 study: viewModel.study,
+                resourceCount: viewModel.resources.count,
                 reviewCount: viewModel.reviewQueue.count,
                 ankiCardCount: viewModel.ankiCards.count,
                 ankiDueCount: viewModel.ankiReviewQueue.count,
@@ -106,6 +107,7 @@ struct StudyDetailView: View {
         VStack(spacing: 0) {
             StudyHeroHeader(
                 study: viewModel.study,
+                resourceCount: viewModel.resources.count,
                 reviewCount: viewModel.reviewQueue.count,
                 ankiCardCount: viewModel.ankiCards.count,
                 ankiDueCount: viewModel.ankiReviewQueue.count,
@@ -163,11 +165,12 @@ struct StudyDetailView: View {
 
 struct StudyHeroHeader: View {
     let study: SDStudy
+    let resourceCount: Int
     let reviewCount: Int
     let ankiCardCount: Int
     let ankiDueCount: Int
     let isLargeCanvas: Bool
-    /// En iPad / Mac: botón para volver a la biblioteca sobre el hero.
+    /// En iPad / Mac: botón para volver a la biblioteca.
     var onNavigateBack: (() -> Void)? = nil
     var onStartAnkiSession: (() -> Void)? = nil
 
@@ -176,129 +179,85 @@ struct StudyHeroHeader: View {
 
     private var hasPractice: Bool { reviewCount > 0 || ankiCardCount > 0 }
 
-    private var heroHeight: CGFloat {
-        if hasPractice {
-            return isLargeCanvas ? 328 : 256
-        }
-        return isLargeCanvas ? 288 : 220
+    /// Verde “play” tipo Spotify (~#1DB954).
+    private let spotifyPlayGreen = Color(red: 0.11, green: 0.73, blue: 0.33)
+
+    /// Fondo barra inferior (~#121212).
+    private let spotifyBarBackground = Color(red: 0.07, green: 0.07, blue: 0.09)
+
+    /// Portada cuadrada (carátula).
+    private var coverSide: CGFloat { isLargeCanvas ? 188 : 124 }
+
+    private var coverCornerRadius: CGFloat { isLargeCanvas ? 10 : 8 }
+
+    private var studyYearString: String {
+        let y = Calendar.current.component(.year, from: study.createdAt)
+        return String(y)
     }
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            heroBackdrop
-                .frame(maxWidth: .infinity)
-                .frame(height: heroHeight)
-                .clipped()
-
-            LinearGradient(
-                stops: [
-                    .init(color: .black.opacity(0.2), location: 0),
-                    .init(color: .black.opacity(0.45), location: 0.45),
-                    .init(color: .black.opacity(0.88), location: 1)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: heroHeight)
-            .allowsHitTesting(false)
-
+        VStack(alignment: .leading, spacing: 0) {
+            // Bloque superior: gradiente azul → marino (estilo cabecera de álbum en Spotify).
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top) {
-                    if let onNavigateBack {
+                if let onNavigateBack {
+                    HStack {
                         Button(action: onNavigateBack) {
                             Label("Biblioteca", systemImage: "chevron.left")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
-                                .background(.ultraThinMaterial, in: Capsule())
-                                .shadow(color: .black.opacity(0.28), radius: 10, y: 3)
+                                .background(Color.white.opacity(0.18), in: Capsule())
                         }
                         .buttonStyle(.plain)
+                        Spacer()
                     }
-                    Spacer()
+                    .padding(.bottom, 14)
                 }
-                .padding(.horizontal, isLargeCanvas ? 24 : 16)
-                .padding(.top, isLargeCanvas ? 12 : 8)
 
-                Spacer(minLength: 0)
+                HStack(alignment: .center, spacing: isLargeCanvas ? 24 : 16) {
+                    coverArtTile
+                        .frame(width: coverSide, height: coverSide)
+                        .shadow(color: .black.opacity(0.45), radius: 20, y: 10)
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("ESTUDIO")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.white.opacity(0.68))
-                        .tracking(2.4)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Estudio")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.88))
 
-                    Text(study.title)
-                        .font(
-                            isLargeCanvas
-                                ? .system(size: 36, weight: .bold, design: .rounded)
-                                : .system(size: 28, weight: .bold, design: .rounded)
-                        )
-                        .foregroundStyle(.white)
-                        .lineLimit(4)
-                        .minimumScaleFactor(0.72)
-                        .shadow(color: .black.opacity(0.5), radius: 16, y: 5)
+                        Text(study.title)
+                            .font(
+                                isLargeCanvas
+                                    ? .system(size: 38, weight: .bold, design: .default)
+                                    : .system(size: 26, weight: .bold, design: .default)
+                            )
+                            .foregroundStyle(.white)
+                            .lineLimit(4)
+                            .minimumScaleFactor(0.72)
+                            .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
 
-                    if !study.desc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text(study.desc)
-                            .font(isLargeCanvas ? .body : .subheadline)
-                            .foregroundStyle(.white.opacity(0.92))
-                            .lineLimit(isLargeCanvas ? 3 : 2)
-                            .shadow(color: .black.opacity(0.4), radius: 8, y: 2)
-                    }
+                        metadataLine
 
-                    if hasPractice {
-                        HStack(spacing: 10) {
-                            if ankiCardCount > 0 {
-                                Button {
-                                    onStartAnkiSession?()
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "rectangle.on.rectangle.angled").font(.caption)
-                                        if ankiDueCount > 0 {
-                                            Text("Flashcards · \(ankiDueCount) pendiente\(ankiDueCount == 1 ? "" : "s")")
-                                                .fontWeight(.semibold)
-                                                .font(isLargeCanvas ? .body : .subheadline)
-                                        } else {
-                                            Text("Flashcards · Repasar todo")
-                                                .fontWeight(.semibold)
-                                                .font(isLargeCanvas ? .body : .subheadline)
-                                        }
-                                    }
-                                    .foregroundStyle(Color.aeroNavy)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, isLargeCanvas ? 12 : 9)
-                                    .background(Color.white, in: Capsule())
-                                    .shadow(color: .black.opacity(0.2), radius: 8, y: 3)
-                                }
-                            }
-
-                            if reviewCount > 0 {
-                                NavigationLink(destination: PracticeSessionView(study: study)) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "doc.questionmark.fill").font(.caption)
-                                        Text("Examen · \(reviewCount)")
-                                            .fontWeight(.semibold)
-                                            .font(isLargeCanvas ? .body : .subheadline)
-                                    }
-                                    .foregroundStyle(Color.white)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, isLargeCanvas ? 12 : 9)
-                                    .background(Color.aeroLavender.opacity(0.42), in: Capsule())
-                                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.4), lineWidth: 1))
-                                }
-                            }
+                        if !study.desc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text(study.desc)
+                                .font(.subheadline)
+                                .foregroundStyle(.white.opacity(0.82))
+                                .lineLimit(isLargeCanvas ? 3 : 2)
                         }
-                        .padding(.top, 4)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal, isLargeCanvas ? 24 : 18)
-                .padding(.bottom, isLargeCanvas ? 24 : 18)
             }
+            .padding(.horizontal, isLargeCanvas ? 24 : 16)
+            .padding(.top, onNavigateBack == nil ? (isLargeCanvas ? 16 : 12) : 6)
+            .padding(.bottom, isLargeCanvas ? 28 : 22)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(spotifyHeaderGradient)
+
+            // Barra inferior oscura con play verde e iconos (como Spotify).
+            spotifyActionStrip
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: heroHeight)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .task(id: study.id) {
             wikipediaFetchFinished = false
             wikipediaThumbnail = await WikipediaThumbnailService.thumbnailURL(for: study.title)
@@ -306,46 +265,181 @@ struct StudyHeroHeader: View {
         }
     }
 
-    @ViewBuilder
-    private var heroBackdrop: some View {
-        if let url = wikipediaThumbnail {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .empty:
-                    heroFallbackGradient
-                        .overlay { ProgressView().tint(.white) }
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure:
-                    heroFallbackGradient
-                @unknown default:
-                    heroFallbackGradient
-                }
-            }
-        } else {
-            heroFallbackGradient
-                .overlay(alignment: .topTrailing) {
-                    if !wikipediaFetchFinished {
-                        ProgressView()
-                            .tint(.white.opacity(0.85))
-                            .padding(14)
-                    }
-                }
-        }
-    }
-
-    private var heroFallbackGradient: some View {
+    private var spotifyHeaderGradient: some View {
         LinearGradient(
             colors: [
-                Color(red: 0.14, green: 0.16, blue: 0.28),
-                Color.aeroNavy,
-                Color.aeroNavyDeep
+                Color(red: 0.20, green: 0.48, blue: 0.92),
+                Color(red: 0.10, green: 0.22, blue: 0.62),
+                Color(red: 0.05, green: 0.08, blue: 0.24)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
+    }
+
+    private var metadataLine: some View {
+        HStack(alignment: .center, spacing: 6) {
+            miniCoverBadge
+                .frame(width: 24, height: 24)
+
+            (
+                Text("Aero").fontWeight(.bold)
+                    + Text(" · \(metadataTail)")
+            )
+            .font(.subheadline)
+            .foregroundStyle(.white.opacity(0.92))
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var metadataTail: String {
+        var parts: [String] = [
+            studyYearString,
+            "\(resourceCount) recurso\(resourceCount == 1 ? "" : "s")"
+        ]
+        if ankiCardCount > 0 {
+            parts.append("\(ankiCardCount) flashcards")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Miniatura circular junto a la línea de metadatos (como el avatar del artista en Spotify).
+    private var miniCoverBadge: some View {
+        ZStack {
+            Circle()
+                .fill(Color.aeroNavyDeep)
+            if let url = wikipediaThumbnail {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 24, height: 24)
+                            .clipped()
+                    default:
+                        Image(systemName: "graduationcap.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                }
+            } else {
+                Image(systemName: "graduationcap.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+        }
+        .frame(width: 24, height: 24)
+        .clipShape(Circle())
+        .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+    }
+
+    private var spotifyActionStrip: some View {
+        HStack(spacing: isLargeCanvas ? 22 : 16) {
+            if ankiCardCount > 0 {
+                Button {
+                    onStartAnkiSession?()
+                } label: {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(.black)
+                        .frame(width: isLargeCanvas ? 58 : 52, height: isLargeCanvas ? 58 : 52)
+                        .background(spotifyPlayGreen, in: Circle())
+                        .shadow(color: .black.opacity(0.35), radius: 12, y: 6)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Repasar flashcards")
+            }
+
+            if reviewCount > 0 {
+                NavigationLink(destination: PracticeSessionView(study: study)) {
+                    Image(systemName: "doc.questionmark.circle")
+                        .font(.system(size: 26))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Examen simulado")
+            }
+
+            if !hasPractice {
+                Text("Añade recursos y genera tarjetas para practicar.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.45))
+                    .padding(.leading, 4)
+            }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "ellipsis")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.55))
+                .frame(width: 36, height: 36)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, isLargeCanvas ? 24 : 16)
+        .padding(.vertical, isLargeCanvas ? 18 : 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(spotifyBarBackground)
+    }
+
+    private var coverArtTile: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: coverCornerRadius, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.aeroNavy.opacity(0.9), Color.aeroNavyDeep],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            coverImageOrPlaceholder
+        }
+        .clipShape(RoundedRectangle(cornerRadius: coverCornerRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: coverCornerRadius, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private var coverImageOrPlaceholder: some View {
+        if let url = wikipediaThumbnail {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                        .tint(.white.opacity(0.9))
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: coverSide, height: coverSide)
+                        .clipped()
+                case .failure:
+                    coverPlaceholderContent
+                @unknown default:
+                    coverPlaceholderContent
+                }
+            }
+        } else {
+            ZStack {
+                if !wikipediaFetchFinished {
+                    ProgressView()
+                        .tint(.white.opacity(0.85))
+                } else {
+                    coverPlaceholderContent
+                }
+            }
+        }
+    }
+
+    private var coverPlaceholderContent: some View {
+        Image(systemName: "text.book.closed.fill")
+            .font(.system(size: coverSide * 0.28, weight: .medium))
+            .foregroundStyle(.white.opacity(0.45))
+            .accessibilityHidden(true)
     }
 }
 
