@@ -229,6 +229,10 @@ struct FlashcardView: View {
             )
         }
         .scrollBounceBehavior(.basedOnSize)
+        .onChange(of: card.id) {
+            tts.stop()
+            speech.stop()
+        }
     }
 
     @ViewBuilder
@@ -259,14 +263,10 @@ struct FlashcardView: View {
                         .font(.title3)
                         .fontWeight(.bold)
                 } else {
-                    HStack(spacing: 10) {
-                        Image(systemName: "xmark.circle.fill").font(.title3)
-                        Text("Incorrecto — revisa la respuesta").font(.title3).fontWeight(.bold)
-                    }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16).padding(.vertical, 13)
-                    .background(Color.red, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    Label("Incorrecto", systemImage: "xmark.circle.fill")
+                        .foregroundStyle(.red)
+                        .font(.title3)
+                        .fontWeight(.bold)
                 }
 
                 // Show model answer for open cards only when wrong
@@ -308,17 +308,30 @@ struct FlashcardView: View {
                         .foregroundStyle(.tertiary)
                 }
 
-                Button(action: onExplainMore) {
-                    if isExpandingExplanation {
-                        ProgressView().scaleEffect(0.9)
-                    } else {
-                        Label("Explicar más", systemImage: "text.book.closed")
-                            .font(.body)
-                            .fontWeight(.medium)
+                HStack(spacing: 12) {
+                    Button(action: onExplainMore) {
+                        if isExpandingExplanation {
+                            ProgressView().scaleEffect(0.9)
+                        } else {
+                            Label("Explicar más", systemImage: "text.book.closed")
+                                .font(.body)
+                                .fontWeight(.medium)
+                        }
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+
+                    Button {
+                        tts.speak(card.answer)
+                    } label: {
+                        Label("Leer respuesta", systemImage: "speaker.wave.2.fill")
+                            .labelStyle(.iconOnly)
+                            .font(.title3)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .accessibilityLabel("Leer respuesta correcta en voz alta")
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
 
                 if let more = expandedExplanation, !more.isEmpty {
                     Text(more)
@@ -332,11 +345,6 @@ struct FlashcardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.green.opacity(0.03))
         .transition(.move(edge: .bottom).combined(with: .opacity))
-        .onAppear {
-            if prefersAudio {
-                tts.speak(card.answer)
-            }
-        }
     }
 
     @ViewBuilder
@@ -379,7 +387,7 @@ struct FlashcardView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.large)
-                    .tint(speech.isRecording ? .red : .indigo)
+                    .tint(speech.isRecording ? .red : Color.aeroNavy)
 
                     if speech.authorizationDenied {
                         Text("Activa micrófono en Ajustes.")
@@ -397,7 +405,7 @@ struct FlashcardView: View {
                             HStack(spacing: 16) {
                                 Image(systemName: selectedMCOption == opt ? "largecircle.fill.circle" : "circle")
                                     .font(.title2)
-                                    .foregroundStyle(selectedMCOption == opt ? Color.indigo : Color.secondary)
+                                    .foregroundStyle(selectedMCOption == opt ? Color.aeroNavy : Color.secondary)
                                 Text(opt)
                                     .font(.title3)
                                     .fontWeight(selectedMCOption == opt ? .medium : .regular)
@@ -406,11 +414,11 @@ struct FlashcardView: View {
                             }
                             .padding(.horizontal, 20)
                             .padding(.vertical, 18)
-                            .background(selectedMCOption == opt ? Color.indigo.opacity(0.10) : Color.aeroSecondaryBackground)
+                            .background(selectedMCOption == opt ? Color.aeroNavy.opacity(0.10) : Color.aeroSecondaryBackground)
                             .clipShape(.rect(cornerRadius: 16))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .strokeBorder(selectedMCOption == opt ? Color.indigo.opacity(0.4) : Color.clear, lineWidth: 2)
+                                    .strokeBorder(selectedMCOption == opt ? Color.aeroNavy.opacity(0.4) : Color.clear, lineWidth: 2)
                             )
                         }
                         .buttonStyle(.plain)

@@ -36,11 +36,7 @@ struct StudyDetailView: View {
         .sheet(isPresented: $viewModel.showingGenerateFlashcards) { GenerateFlashcardsSheet(viewModel: viewModel) }
         .sheet(isPresented: $viewModel.showingGenerateAnkiCards) { GenerateAnkiCardsSheet(viewModel: viewModel) }
         .sheet(isPresented: $viewModel.showingCreateFlashcardManual) { CreateFlashcardManualView(viewModel: viewModel) }
-        .sheet(isPresented: $viewModel.showingGenerateFromGaps) {
-            GenerateFromGapsSheet(viewModel: viewModel) {
-                selectedTab = 1
-            }
-        }
+        .sheet(isPresented: $viewModel.showingGenerateFromGaps) { GenerateFromGapsSheet(viewModel: viewModel) }
         .fullScreenCover(isPresented: $showingAnkiSession) { AnkiSessionView(viewModel: viewModel) }
         .onAppear {
             viewModel.modelContext = modelContext
@@ -380,13 +376,7 @@ struct ResourcesTab: View {
                         progress: mastery.progress
                     )
 
-                    Button {
-                        viewModel.showingAddResource = true
-                    } label: {
-                        Label("Explorar archivos", systemImage: "folder")
-                            .fontWeight(.semibold)
-                    }
-                    .buttonStyle(AeroPrimaryButtonStyle())
+
                 }
                 .padding(.horizontal, isLargeCanvas ? 24 : 16)
                 .padding(.vertical, 16)
@@ -449,7 +439,7 @@ struct ResourcesTab: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Agregar recurso")
                     .padding(.trailing, 20)
-                    .padding(.bottom, 6)
+                    .padding(.bottom, 24)
                 }
             }
         }
@@ -870,57 +860,6 @@ struct FlashcardItemView: View {
     }
 }
 
-// MARK: - Fila: concepto con fallos (Progreso)
-
-private struct FailingConceptRow: View {
-    let gap: ConceptGap
-    let isLargeCanvas: Bool
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.body)
-                .foregroundStyle(.orange)
-                .frame(width: 22, alignment: .center)
-                .padding(.top, 2)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(gap.concept)
-                    .font(isLargeCanvas ? .body : .subheadline)
-                    .fontWeight(.semibold)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 6) {
-                    Text("\(gap.errors) \(gap.errors == 1 ? "error" : "errores") · \(gap.total_attempts) intentos")
-                    Text("·")
-                    Text("\(Int(gap.error_rate * 100))% fallos")
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                if let et = gap.dominant_error_type {
-                    Text(errorTypeShort(et))
-                        .font(.caption2)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.orange.opacity(0.12))
-                        .foregroundStyle(.orange)
-                        .clipShape(Capsule())
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, 6)
-    }
-
-    private func errorTypeShort(_ type: ErrorType) -> String {
-        switch type {
-        case .conceptual: return "Conceptual"
-        case .memoria: return "Memoria"
-        case .confusion: return "Confusión"
-        case .incompleto: return "Incompleto"
-        }
-    }
-}
-
 // MARK: - Progress Tab
 
 struct ProgressTab: View {
@@ -929,7 +868,6 @@ struct ProgressTab: View {
 
     var body: some View {
         if let gaps = viewModel.gapAnalysis {
-            let reinforcement = viewModel.reinforcementGaps
             let allAttempts = viewModel.flashcards.flatMap(\.attempts)
             let totalAtt = allAttempts.count
             let correctAtt = allAttempts.filter(\.isCorrect).count
@@ -938,7 +876,6 @@ struct ProgressTab: View {
 
             let hasExamData = totalAtt > 0
             let hasAnkiData = ankiTotal > 0
-            let hasReinforcementData = !reinforcement.isEmpty
 
             if !hasExamData && !hasAnkiData {
                 ContentUnavailableView(
@@ -949,68 +886,6 @@ struct ProgressTab: View {
             } else {
                 ScrollView {
                     VStack(spacing: 14) {
-
-                        // ── Prioridad: conceptos donde fallas + generar flashcards ──
-                        if hasReinforcementData {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "target")
-                                        .font(.title2)
-                                        .foregroundStyle(.orange)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Conceptos en los que fallas")
-                                            .font(isLargeCanvas ? .title2 : .title3)
-                                            .fontWeight(.bold)
-                                        Text("Usa las etiquetas de cada flashcard de examen; si no tiene, mostramos la pregunta. Si solo usas Anki, aparecen aquí los conceptos con más dificultad.")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    Spacer(minLength: 0)
-                                }
-
-                                VStack(alignment: .leading, spacing: 0) {
-                                    let show = Array(reinforcement.prefix(12))
-                                    ForEach(Array(show.enumerated()), id: \.element.id) { index, gap in
-                                        FailingConceptRow(gap: gap, isLargeCanvas: isLargeCanvas)
-                                        if index < show.count - 1 {
-                                            Divider().padding(.leading, 8)
-                                        }
-                                    }
-                                }
-                                .padding(14)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .fill(Color.orange.opacity(0.08))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .strokeBorder(Color.orange.opacity(0.25), lineWidth: 1)
-                                )
-
-                                Button {
-                                    viewModel.showingGenerateFromGaps = true
-                                } label: {
-                                    Label("Generar flashcards según estos conceptos", systemImage: "wand.and.stars")
-                                        .font(.headline)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 14)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(Color.aeroNavy)
-                                .disabled(viewModel.resources.isEmpty)
-                            }
-                        } else if hasExamData || hasAnkiData {
-                            AeroSurfaceCard {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Label("Aún sin conceptos con fallos detectados", systemImage: "checkmark.circle")
-                                        .font(.headline)
-                                    Text("Cuando acumules intentos incorrectos en el examen o repasos Anki difíciles, aquí verás la lista y podrás generar refuerzo con IA.")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
 
                         // ── Sección Examen Simulado ──
                         if hasExamData {
@@ -1082,16 +957,38 @@ struct ProgressTab: View {
                             }
 
                             if !gaps.gaps.isEmpty {
-                                ProgressSectionHeader(title: "Detalle estadístico (examen)",
-                                                      systemImage: "chart.bar.doc.horizontal",
-                                                      color: .secondary)
-                                Text("Desglose por umbral de tasa de error; la lista superior resume todos los fallos por concepto o tarjeta.")
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
-                                    .padding(.bottom, 4)
+                                ProgressSectionHeader(title: "Lagunas (Examen)",
+                                                      systemImage: "exclamationmark.triangle.fill",
+                                                      color: .orange)
                                 ForEach(gaps.gaps) { gap in
                                     GapCardView(gap: gap, isLargeCanvas: isLargeCanvas)
                                 }
+                                Button {
+                                    viewModel.showingGenerateFromGaps = true
+                                } label: {
+                                    AeroSurfaceCard {
+                                        HStack(spacing: 14) {
+                                            ZStack {
+                                                Circle()
+                                                    .fill(LinearGradient(colors: [.orange, .red],
+                                                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+                                                    .frame(width: 46, height: 46)
+                                                Image(systemName: "wand.and.stars").font(.title3).foregroundStyle(.white)
+                                            }
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text("Generar tarjetas de refuerzo")
+                                                    .font(isLargeCanvas ? .subheadline : .callout)
+                                                    .fontWeight(.semibold).foregroundStyle(.primary)
+                                                Text("La IA creará preguntas de examen sobre tus \(gaps.gaps.count) laguna\(gaps.gaps.count == 1 ? "" : "s")")
+                                                    .font(.caption2).foregroundStyle(.secondary)
+                                            }
+                                            Spacer()
+                                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.orange)
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(viewModel.resources.isEmpty)
                             }
 
                             if !gaps.strongConcepts.isEmpty {
@@ -1138,17 +1035,15 @@ struct ProgressTab: View {
                     .padding(.horizontal, isLargeCanvas ? 24 : 16)
                     .padding(.vertical, 12)
                 }
-                .onAppear {
-                    viewModel.fetchContent()
-                }
             }
         } else {
-            ContentUnavailableView(
-                "Progreso",
-                systemImage: "chart.bar.fill",
-                description: Text("Actualizando datos del estudio…")
-            )
-            .onAppear { viewModel.fetchContent() }
+            VStack(spacing: 12) {
+                ProgressView()
+                Text("Analizando tu progreso...")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxHeight: .infinity)
         }
     }
 
@@ -1397,11 +1292,9 @@ struct GapCardView: View {
                         }
                         VStack(alignment: .leading, spacing: 3) {
                             HStack(spacing: 6) {
-                                Text(gap.concept)
+                                Text(gap.concept.capitalized)
                                     .font(isLargeCanvas ? .subheadline : .callout)
                                     .fontWeight(.semibold)
-                                    .multilineTextAlignment(.leading)
-                                    .lineLimit(isExpanded ? nil : 3)
                                 Text(severityLabel)
                                     .font(.caption2)
                                     .fontWeight(.bold)
@@ -1513,26 +1406,17 @@ struct GenerateFromGapsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-    /// Tras guardar desde la revisión, p. ej. cambiar a la pestaña Flashcards (Anki).
-    var onCardsSaved: (() -> Void)?
-
     @State private var drafts: [EditableFlashcard] = []
     @State private var navigateReview = false
     @State private var isGenerating = false
     @State private var generationError: String?
-    @State private var generationProgress: CGFloat = 0
+    @State private var generationProgress: Double = 0
     @State private var generationStatus = "Preparando..."
 
     private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
-    private var typeScale: AeroTypeScale { AeroTypeScale.make(isLargeCanvas: isLargeCanvas) }
-
-    init(viewModel: StudyDetailViewModel, onCardsSaved: (() -> Void)? = nil) {
-        self.viewModel = viewModel
-        self.onCardsSaved = onCardsSaved
-    }
 
     private var gaps: [ConceptGap] {
-        viewModel.reinforcementGaps
+        viewModel.gapAnalysis?.gaps ?? []
     }
 
     var body: some View {
@@ -1587,9 +1471,8 @@ struct GenerateFromGapsSheet: View {
                                                     .font(.caption).fontWeight(.bold).foregroundStyle(.orange)
                                             }
                                             VStack(alignment: .leading, spacing: 2) {
-                                                Text(gap.concept)
+                                                Text(gap.concept.capitalized)
                                                     .font(.subheadline).fontWeight(.medium)
-                                                    .lineLimit(3)
                                                 if let det = gap.dominant_error_type {
                                                     Text(det.rawValue.capitalized)
                                                         .font(.caption2).foregroundStyle(.secondary)
@@ -1620,23 +1503,31 @@ struct GenerateFromGapsSheet: View {
                 .blur(radius: isGenerating ? 3 : 0)
 
                 if isGenerating {
-                    Color.black.opacity(0.15)
-                        .ignoresSafeArea()
-                        .transition(.opacity)
-
-                    GenerationProgressOverlay(
-                        progress: generationProgress,
-                        statusText: generationStatus,
-                        typeScale: typeScale
+                    Color.black.opacity(0.12).ignoresSafeArea().transition(.opacity)
+                    VStack(spacing: 20) {
+                        ProgressView(value: generationProgress) {
+                            Text(generationStatus)
+                                .font(.subheadline).fontWeight(.medium)
+                        }
+                        .progressViewStyle(.circular)
+                        .scaleEffect(1.5)
+                        .padding(.bottom, 8)
+                        Text(generationStatus)
+                            .font(.subheadline).foregroundStyle(.secondary)
+                        Text("\(Int(generationProgress * 100))%")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(32)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(.ultraThinMaterial)
+                            .shadow(color: .black.opacity(0.1), radius: 16, y: 8)
                     )
-                    .transition(.scale(scale: 0.85).combined(with: .opacity))
+                    .transition(.scale(scale: 0.9).combined(with: .opacity))
                 }
             }
             .navigationTitle("Generar desde lagunas")
             .navigationBarTitleDisplayMode(.inline)
-            .onAppear {
-                viewModel.fetchContent()
-            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cerrar") { dismiss() }.disabled(isGenerating)
@@ -1656,10 +1547,8 @@ struct GenerateFromGapsSheet: View {
                     drafts: $drafts,
                     onFinish: {
                         navigateReview = false
-                        onCardsSaved?()
                         dismiss()
-                    },
-                    alsoSaveAsAnkiCards: true
+                    }
                 )
             }
         }
@@ -1680,8 +1569,7 @@ struct GenerateFromGapsSheet: View {
                 onProgress: { progress in
                     Task { @MainActor in
                         let total = max(1, progress.totalChunks)
-                        let chunk = Double(progress.completedChunks) / Double(total)
-                        generationProgress = CGFloat(0.05 + 0.85 * chunk)
+                        generationProgress = 0.05 + 0.85 * (Double(progress.completedChunks) / Double(total))
                         generationStatus = progress.completedChunks < total
                             ? "Generando parte \(progress.completedChunks + 1) de \(total)..."
                             : "Finalizando..."

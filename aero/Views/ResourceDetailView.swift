@@ -9,6 +9,11 @@ struct ResourceDetailView: View {
     @State private var title: String = ""
     @State private var content: String = ""
     @State private var errorMessage: String?
+    @State private var showDiscardAlert = false
+
+    private var hasChanges: Bool {
+        title != resource.title || content != resource.content
+    }
 
     private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
     private var contentWidth: CGFloat {
@@ -21,35 +26,25 @@ struct ResourceDetailView: View {
 
             ScrollView {
                 VStack(spacing: 14) {
-                    AeroSurfaceCard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(spacing: 10) {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .fill(Color.aeroNavy.opacity(0.14))
-                                        .frame(width: 44, height: 44)
-                                    Image(systemName: "doc.text.fill")
-                                        .font(.title3)
-                                        .foregroundStyle(Color.aeroNavy)
-                                }
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Recurso de estudio")
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                    Text("Edita el título y el texto. Los cambios se guardan al pulsar Guardar.")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                Spacer(minLength: 0)
-                            }
-                            Divider()
-                            Label("Título", systemImage: "textformat")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            TextField("Título", text: $title)
-                                .textFieldStyle(.roundedBorder)
-                        }
+                    // Título grande y prominente
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Título")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                            .tracking(0.8)
+                            .padding(.horizontal, 4)
+                        TextField("Título del recurso", text: $title)
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(.primary)
+                            .textFieldStyle(.plain)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color(uiColor: .systemBackground))
+                                    .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
+                            )
                     }
 
                     AeroSurfaceCard {
@@ -65,7 +60,8 @@ struct ResourceDetailView: View {
                                     .monospacedDigit()
                             }
                             TextEditor(text: $content)
-                                .frame(minHeight: isLargeCanvas ? 360 : 240)
+                                .frame(minHeight: 600)
+                                .scrollDisabled(true)
                                 .padding(8)
                                 .background(Color.aeroSecondaryBackground.opacity(0.8))
                                 .clipShape(.rect(cornerRadius: 12))
@@ -93,22 +89,29 @@ struct ResourceDetailView: View {
         }
         .navigationTitle("Recurso")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.visible, for: .navigationBar)           // override parent's .hidden
-        .toolbarColorScheme(.light, for: .navigationBar)  // always light, regardless of header
+        .toolbar(.visible, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("Cancelar") { dismiss() }
-                    .foregroundStyle(.secondary)
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancelar") {
+                    if hasChanges { showDiscardAlert = true } else { dismiss() }
+                }
             }
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .confirmationAction) {
                 Button {
                     studyViewModel.updateResource(id: resource.id, title: title, content: content)
                     dismiss()
                 } label: {
                     Text("Guardar").fontWeight(.semibold)
                 }
-                .disabled(title.count < 3 || content.isEmpty)
+                .disabled(!hasChanges || title.count < 3 || content.isEmpty)
             }
+        }
+        .confirmationDialog("¿Descartar cambios?", isPresented: $showDiscardAlert, titleVisibility: .visible) {
+            Button("Descartar cambios", role: .destructive) { dismiss() }
+            Button("Seguir editando", role: .cancel) {}
+        } message: {
+            Text("Tienes cambios sin guardar. Si sales ahora, se perderán.")
         }
         .onAppear {
             title = resource.title
