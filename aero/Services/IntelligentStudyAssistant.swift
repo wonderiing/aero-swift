@@ -175,7 +175,6 @@ enum IntelligentStudyAssistant {
             }
         }
 
-        // Recortar al número exacto pedido — nunca más, nunca menos si el material alcanzó
         allCards = Array(allCards.prefix(target))
         fmLog("generateFlashcards", "✅ Final: \(allCards.count)/\(target) tarjetas")
         return allCards

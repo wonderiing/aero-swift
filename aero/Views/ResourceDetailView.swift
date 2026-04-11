@@ -79,7 +79,6 @@ struct ResourceDetailView: View {
                             } else {
                                 ScrollView {
                                     AeroMarkdownText(markdown: content)
-                                        .font(.body)
                                         .textSelection(.enabled)
                                         .padding(12)
                                         .frame(maxWidth: .infinity, alignment: .leading)

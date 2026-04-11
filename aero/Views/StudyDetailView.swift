@@ -62,24 +62,16 @@ struct StudyDetailView: View {
     @ViewBuilder
     private var largeCanvasLayout: some View {
         VStack(spacing: 0) {
-            // Study title bar with optional back action
-            HStack(spacing: 0) {
-                if let onNavigateBack {
-                    Button(action: onNavigateBack) {
-                        HStack(spacing: 5) {
-                            Image(systemName: "chevron.left").font(.caption.weight(.semibold))
-                            Text("Biblioteca").font(.subheadline)
-                        }
-                        .foregroundStyle(Color.aeroNavy)
-                        .padding(.horizontal, 16)
-                    }
-                    .buttonStyle(.plain)
-                    Divider().frame(height: 20)
-                }
-                StudyTabPicker(selectedTab: $selectedTab, isLargeCanvas: true)
-            }
-            .background(Color(uiColor: .systemBackground))
-
+            StudyHeroHeader(
+                study: viewModel.study,
+                reviewCount: viewModel.reviewQueue.count,
+                ankiCardCount: viewModel.ankiCards.count,
+                ankiDueCount: viewModel.ankiReviewQueue.count,
+                isLargeCanvas: true,
+                onNavigateBack: onNavigateBack,
+                onStartAnkiSession: { showingAnkiSession = true }
+            )
+            StudyTabPicker(selectedTab: $selectedTab, isLargeCanvas: true)
             Divider()
 
             // Content
@@ -118,6 +110,7 @@ struct StudyDetailView: View {
                 ankiCardCount: viewModel.ankiCards.count,
                 ankiDueCount: viewModel.ankiReviewQueue.count,
                 isLargeCanvas: false,
+                onNavigateBack: nil,
                 onStartAnkiSession: { showingAnkiSession = true }
             )
             StudyTabPicker(selectedTab: $selectedTab, isLargeCanvas: false)
@@ -174,87 +167,185 @@ struct StudyHeroHeader: View {
     let ankiCardCount: Int
     let ankiDueCount: Int
     let isLargeCanvas: Bool
+    /// En iPad / Mac: botón para volver a la biblioteca sobre el hero.
+    var onNavigateBack: (() -> Void)? = nil
     var onStartAnkiSession: (() -> Void)? = nil
+
+    @State private var wikipediaThumbnail: URL?
+    @State private var wikipediaFetchFinished = false
 
     private var hasPractice: Bool { reviewCount > 0 || ankiCardCount > 0 }
 
+    private var heroHeight: CGFloat {
+        if hasPractice {
+            return isLargeCanvas ? 328 : 256
+        }
+        return isLargeCanvas ? 288 : 220
+    }
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
+            heroBackdrop
+                .frame(maxWidth: .infinity)
+                .frame(height: heroHeight)
+                .clipped()
+
             LinearGradient(
-                colors: [Color.aeroNavy, Color.aeroNavyDeep],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+                stops: [
+                    .init(color: .black.opacity(0.2), location: 0),
+                    .init(color: .black.opacity(0.45), location: 0.45),
+                    .init(color: .black.opacity(0.88), location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
             )
-            .ignoresSafeArea(edges: .top)
+            .frame(height: heroHeight)
+            .allowsHitTesting(false)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Tema actual")
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.white.opacity(0.72))
-                    .textCase(.uppercase)
-                    .tracking(1.35)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top) {
+                    if let onNavigateBack {
+                        Button(action: onNavigateBack) {
+                            Label("Biblioteca", systemImage: "chevron.left")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(.ultraThinMaterial, in: Capsule())
+                                .shadow(color: .black.opacity(0.28), radius: 10, y: 3)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, isLargeCanvas ? 24 : 16)
+                .padding(.top, isLargeCanvas ? 12 : 8)
 
-                Text(study.title)
-                    .font(isLargeCanvas ? .largeTitle : .title2)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.white)
+                Spacer(minLength: 0)
 
-                Text(study.desc)
-                    .font(isLargeCanvas ? .body : .subheadline)
-                    .foregroundStyle(.white.opacity(0.82))
-                    .lineLimit(isLargeCanvas ? 3 : 2)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("ESTUDIO")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white.opacity(0.68))
+                        .tracking(2.4)
 
-                if hasPractice {
-                    HStack(spacing: 10) {
-                        if ankiCardCount > 0 {
-                            Button {
-                                onStartAnkiSession?()
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "rectangle.on.rectangle.angled").font(.caption)
-                                    if ankiDueCount > 0 {
-                                        Text("Flashcards · \(ankiDueCount) pendiente\(ankiDueCount == 1 ? "" : "s")")
-                                            .fontWeight(.semibold)
-                                            .font(isLargeCanvas ? .body : .subheadline)
-                                    } else {
-                                        Text("Flashcards · Repasar todo")
+                    Text(study.title)
+                        .font(
+                            isLargeCanvas
+                                ? .system(size: 36, weight: .bold, design: .rounded)
+                                : .system(size: 28, weight: .bold, design: .rounded)
+                        )
+                        .foregroundStyle(.white)
+                        .lineLimit(4)
+                        .minimumScaleFactor(0.72)
+                        .shadow(color: .black.opacity(0.5), radius: 16, y: 5)
+
+                    if !study.desc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text(study.desc)
+                            .font(isLargeCanvas ? .body : .subheadline)
+                            .foregroundStyle(.white.opacity(0.92))
+                            .lineLimit(isLargeCanvas ? 3 : 2)
+                            .shadow(color: .black.opacity(0.4), radius: 8, y: 2)
+                    }
+
+                    if hasPractice {
+                        HStack(spacing: 10) {
+                            if ankiCardCount > 0 {
+                                Button {
+                                    onStartAnkiSession?()
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "rectangle.on.rectangle.angled").font(.caption)
+                                        if ankiDueCount > 0 {
+                                            Text("Flashcards · \(ankiDueCount) pendiente\(ankiDueCount == 1 ? "" : "s")")
+                                                .fontWeight(.semibold)
+                                                .font(isLargeCanvas ? .body : .subheadline)
+                                        } else {
+                                            Text("Flashcards · Repasar todo")
+                                                .fontWeight(.semibold)
+                                                .font(isLargeCanvas ? .body : .subheadline)
+                                        }
+                                    }
+                                    .foregroundStyle(Color.aeroNavy)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, isLargeCanvas ? 12 : 9)
+                                    .background(Color.white, in: Capsule())
+                                    .shadow(color: .black.opacity(0.2), radius: 8, y: 3)
+                                }
+                            }
+
+                            if reviewCount > 0 {
+                                NavigationLink(destination: PracticeSessionView(study: study)) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "doc.questionmark.fill").font(.caption)
+                                        Text("Examen · \(reviewCount)")
                                             .fontWeight(.semibold)
                                             .font(isLargeCanvas ? .body : .subheadline)
                                     }
+                                    .foregroundStyle(Color.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, isLargeCanvas ? 12 : 9)
+                                    .background(Color.aeroLavender.opacity(0.42), in: Capsule())
+                                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.4), lineWidth: 1))
                                 }
-                                .foregroundStyle(Color.aeroNavy)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, isLargeCanvas ? 12 : 9)
-                                .background(Color.white, in: Capsule())
                             }
                         }
-
-                        if reviewCount > 0 {
-                            NavigationLink(destination: PracticeSessionView(study: study)) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "doc.questionmark.fill").font(.caption)
-                                    Text("Examen · \(reviewCount)")
-                                        .fontWeight(.semibold)
-                                        .font(isLargeCanvas ? .body : .subheadline)
-                                }
-                                .foregroundStyle(Color.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, isLargeCanvas ? 12 : 9)
-                                .background(Color.aeroLavender.opacity(0.35), in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
-                            }
-                        }
+                        .padding(.top, 4)
                     }
-                    .padding(.top, 4)
                 }
+                .padding(.horizontal, isLargeCanvas ? 24 : 18)
+                .padding(.bottom, isLargeCanvas ? 24 : 18)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, isLargeCanvas ? 26 : 20)
-            .padding(.top, isLargeCanvas ? 22 : 16)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: hasPractice ? (isLargeCanvas ? 220 : 178) : (isLargeCanvas ? 164 : 128))
+        .frame(height: heroHeight)
+        .task(id: study.id) {
+            wikipediaFetchFinished = false
+            wikipediaThumbnail = await WikipediaThumbnailService.thumbnailURL(for: study.title)
+            wikipediaFetchFinished = true
+        }
+    }
+
+    @ViewBuilder
+    private var heroBackdrop: some View {
+        if let url = wikipediaThumbnail {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .empty:
+                    heroFallbackGradient
+                        .overlay { ProgressView().tint(.white) }
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    heroFallbackGradient
+                @unknown default:
+                    heroFallbackGradient
+                }
+            }
+        } else {
+            heroFallbackGradient
+                .overlay(alignment: .topTrailing) {
+                    if !wikipediaFetchFinished {
+                        ProgressView()
+                            .tint(.white.opacity(0.85))
+                            .padding(14)
+                    }
+                }
+        }
+    }
+
+    private var heroFallbackGradient: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 0.14, green: 0.16, blue: 0.28),
+                Color.aeroNavy,
+                Color.aeroNavyDeep
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 }
 
