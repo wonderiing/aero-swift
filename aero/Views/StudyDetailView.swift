@@ -11,9 +11,9 @@ struct StudyDetailView: View {
     @AppStorage("podcastEnabled") private var podcastEnabled: Bool = false
     @AppStorage("accessibilityNeeds") private var accessibilityNeeds: String = ""
     @AppStorage("sessionStyle") private var sessionStyle: String = ""
+    @EnvironmentObject private var podcastState: PodcastPlayerState
     @State private var selectedTab = 0
     @State private var showingAnkiSession = false
-    @State private var showingPodcast = false
 
     var onNavigateBack: (() -> Void)? = nil
 
@@ -56,7 +56,6 @@ struct StudyDetailView: View {
             }
         }
         .fullScreenCover(isPresented: $showingAnkiSession) { AnkiSessionView(viewModel: viewModel) }
-        .fullScreenCover(isPresented: $showingPodcast) { StudyPodcastPlayerView(study: viewModel.study) }
         .onAppear {
             viewModel.modelContext = modelContext
             viewModel.fetchContent()
@@ -81,7 +80,7 @@ struct StudyDetailView: View {
                 isLargeCanvas: true,
                 onNavigateBack: onNavigateBack,
                 onStartAnkiSession: { showingAnkiSession = true },
-                onStartPodcast: showPodcastButton ? { showingPodcast = true } : nil
+                onStartPodcast: showPodcastButton ? { podcastState.start(study: viewModel.study) } : nil
             )
             StudyTabPicker(selectedTab: $selectedTab, isLargeCanvas: true)
             Divider()
@@ -125,7 +124,7 @@ struct StudyDetailView: View {
                 isLargeCanvas: false,
                 onNavigateBack: nil,
                 onStartAnkiSession: { showingAnkiSession = true },
-                onStartPodcast: showPodcastButton ? { showingPodcast = true } : nil
+                onStartPodcast: showPodcastButton ? { podcastState.start(study: viewModel.study) } : nil
             )
             StudyTabPicker(selectedTab: $selectedTab, isLargeCanvas: false)
 

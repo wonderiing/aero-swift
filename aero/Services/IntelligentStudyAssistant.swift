@@ -95,10 +95,10 @@ enum IntelligentStudyAssistant {
         let titleToId = Dictionary(uniqueKeysWithValues: resources.map { ($0.title, $0.id) })
 
         // ── Dividir material en chunks que quepan en 4096 tokens ──
-        // El modelo usa ~2 tokens/char en español. Instructions + schema + output
-        // consumen ~3000 tokens, dejando ~1000 tokens ≈ ~500 chars para material.
-        // Usamos 1500 chars como límite por chunk (conservador pero seguro).
-        let maxCharsPerChunk = 1_500
+        // El modelo usa ~1.5 tokens/char en español. Instructions + schema (condensado) + output
+        // consumen ~2600 tokens, dejando ~1500 tokens ≈ ~1000 chars para material.
+        // Usamos 1800 chars como límite por chunk (ajustado tras condensar @Guide).
+        let maxCharsPerChunk = 1_800
         let chunks = buildMaterialChunks(resources: resources, maxCharsPerChunk: maxCharsPerChunk)
         let cardsPerChunk = max(2, target / max(1, chunks.count))
 
@@ -138,8 +138,9 @@ enum IntelligentStudyAssistant {
         // Si no generamos nada, lanzar el primer error
         if allCards.isEmpty, let err = firstError { throw err }
 
-        // ── Fill passes: lotes pequeños de 4 hasta alcanzar el objetivo ──
-        // Los modelos on-device generan mucho más confiablemente lotes pequeños.
+        // ── Fill passes: lotes de 6, máximo 4 intentos ──
+        // Lotes un poco más grandes reducen llamadas totales; 4 intentos bastan
+        // para alcanzar el target sin degradar tiempos.
         let allMaterial = chunks.map { $0.material }.joined(separator: "\n\n---\n\n")
         let allTitles = chunks.flatMap { $0.resourceList.components(separatedBy: "\n") }
             .filter { $0.hasPrefix("- ") }.joined(separator: "\n")
@@ -148,14 +149,13 @@ enum IntelligentStudyAssistant {
             material: String(allMaterial.prefix(3_000))
         )
         var fillAttempt = 0
-        let batchSize = 4  // Lotes pequeños = modelo más confiable
-        while allCards.count < target && fillAttempt < 8 {
+        let batchSize = 6
+        while allCards.count < target && fillAttempt < 4 {
             fillAttempt += 1
             let needed = target - allCards.count
             let thisBatch = min(needed, batchSize)
             fmLog("generateFlashcards", "  📋 fill \(fillAttempt) — pidiendo \(thisBatch) (faltan \(needed) de \(target))")
             do {
-                // totalChunks: 2 → usa GeneratedFlashcardChunk (min:3, max:8) — más fiable
                 let more = try await generateChunk(
                     chunk: combinedChunk,
                     cardsTarget: thisBatch,
@@ -166,7 +166,7 @@ enum IntelligentStudyAssistant {
                 )
                 let existingQs = Set(allCards.map { String($0.question.lowercased().prefix(50)) })
                 let unique = more.filter { !existingQs.contains(String($0.question.lowercased().prefix(50))) }
-                if unique.isEmpty { break }  // sin nuevas únicas → parar
+                if unique.isEmpty { break }
                 allCards.append(contentsOf: unique)
                 fmLog("generateFlashcards", "  fill \(fillAttempt) → +\(unique.count) (total: \(allCards.count)/\(target))")
             } catch {
@@ -387,7 +387,7 @@ enum IntelligentStudyAssistant {
 
         let target = depth.approximateCardCount
         let titleToId = Dictionary(uniqueKeysWithValues: resources.map { ($0.title, $0.id) })
-        let maxCharsPerChunk = 1_500
+        let maxCharsPerChunk = 1_800
         let chunks = buildMaterialChunks(resources: resources, maxCharsPerChunk: maxCharsPerChunk)
         let cardsPerChunk = max(2, target / max(1, chunks.count))
 
@@ -419,7 +419,7 @@ enum IntelligentStudyAssistant {
         onProgress?(GenerationProgress(completedChunks: chunks.count, totalChunks: chunks.count))
         if allCards.isEmpty, let err = firstError { throw err }
 
-        // Fill passes Anki — lotes pequeños de 4 hasta alcanzar objetivo
+        // Fill passes Anki — lotes de 6, máximo 4 intentos
         let ankiAllMaterial = chunks.map { $0.material }.joined(separator: "\n\n---\n\n")
         let ankiAllTitles = chunks.flatMap { $0.resourceList.components(separatedBy: "\n") }
             .filter { $0.hasPrefix("- ") }.joined(separator: "\n")
@@ -428,8 +428,8 @@ enum IntelligentStudyAssistant {
             material: String(ankiAllMaterial.prefix(3_000))
         )
         var fillAttempt = 0
-        let ankiBatchSize = 4
-        while allCards.count < target && fillAttempt < 8 {
+        let ankiBatchSize = 6
+        while allCards.count < target && fillAttempt < 4 {
             fillAttempt += 1
             let needed = target - allCards.count
             let thisBatch = min(needed, ankiBatchSize)
@@ -441,7 +441,7 @@ enum IntelligentStudyAssistant {
                     titleToId: titleToId,
                     fallbackResourceId: resources.first?.id,
                     chunkIndex: 0,
-                    totalChunks: 2   // usa GeneratedAnkiChunk (min:3) — más confiable
+                    totalChunks: 2
                 )
                 let existingQs = Set(allCards.map { String($0.front.lowercased().prefix(50)) })
                 let unique = more.filter { !existingQs.contains(String($0.front.lowercased().prefix(50))) }
@@ -591,7 +591,7 @@ enum IntelligentStudyAssistant {
         }.joined(separator: "\n")
 
         let titleToId = Dictionary(uniqueKeysWithValues: resources.map { ($0.title, $0.id) })
-        let maxCharsPerChunk = 1_500
+        let maxCharsPerChunk = 1_800
         let chunks = buildMaterialChunks(resources: resources, maxCharsPerChunk: maxCharsPerChunk)
 
         fmLog("generateFromGaps", "→ \(gaps.prefix(5).count) lagunas, chunks=\(chunks.count)")
@@ -778,16 +778,32 @@ enum IntelligentStudyAssistant {
         cardType: FlashcardType,
         options: FlashcardOptions?
     ) async throws -> CreateAttemptDto {
+        // ── Atajo MC: evaluación determinista, sin IA ──
+        // Opción múltiple no necesita modelo — la respuesta es correcta o no.
+        if cardType == .multipleChoice, let opts = options {
+            let result = AnswerEvaluationService.evaluate(
+                question: question,
+                correctAnswer: correctAnswer,
+                userAnswer: nil,
+                selectedMultipleChoice: userAnswer,
+                cardType: .multipleChoice,
+                options: opts
+            )
+            fmLog("evaluateAnswer", "→ MC determinista (sin IA) isCorrect=\(result.isCorrect)")
+            return result
+        }
+
+        // ── Atajo open: respuestas que claramente no intentan contestar ──
+        if cardType == .open, let canned = AnswerEvaluationService.openAnswerIfClearlyNonAttempt(userAnswer: userAnswer) {
+            fmLog("evaluateAnswer", "→ canned non-attempt (sin IA)")
+            return canned
+        }
+
         if !isAppleIntelligenceReady {
             let ready = await waitForModelReadiness(timeout: 5)
             if !ready {
                 throw StudyAIError.modelUnavailable(unavailabilityReasonDescription())
             }
-        }
-
-        if cardType == .open, let canned = AnswerEvaluationService.openAnswerIfClearlyNonAttempt(userAnswer: userAnswer) {
-            fmLog("evaluateAnswer", "→ canned non-attempt (sin IA)")
-            return canned
         }
 
         let rawNeeds = UserDefaults.standard.string(forKey: "accessibilityNeeds") ?? ""
@@ -834,7 +850,7 @@ enum IntelligentStudyAssistant {
         fmLog("evaluateAnswer", "→ prompt=\(prompt.count)chars")
 
         return try await executeGeneration(tag: "evaluateAnswer") {
-            try await session.respond(to: prompt, generating: GeneratedAnswerEvaluation.self)
+            try await session.respond(to: prompt, generating: GeneratedAnswerVerdict.self)
         } transform: { response in
             fmLog("evaluateAnswer", "✅ isCorrect=\(response.content.isCorrect)")
             let ev = response.content
@@ -852,9 +868,62 @@ enum IntelligentStudyAssistant {
                 errorType: mappedError,
                 missingConcepts: ev.missingConcepts,
                 incorrectConcepts: ev.incorrectConcepts,
-                feedback: ev.feedback,
+                feedback: nil,
                 confidenceScore: min(1, max(0, ev.confidenceScore))
             )
+        }
+    }
+
+    // MARK: - Feedback lazy (generado solo si el usuario lo pide)
+
+    static func generateAnswerFeedback(
+        question: String,
+        correctAnswer: String,
+        userAnswer: String?,
+        isCorrect: Bool,
+        errorType: String?
+    ) async throws -> String {
+        if !isAppleIntelligenceReady {
+            let ready = await waitForModelReadiness(timeout: 5)
+            if !ready {
+                throw StudyAIError.modelUnavailable(unavailabilityReasonDescription())
+            }
+        }
+
+        let rawNeeds = UserDefaults.standard.string(forKey: "accessibilityNeeds") ?? ""
+        let needs = Set(rawNeeds.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+
+        let instructions = Instructions {
+            "Eres un tutor que explica brevemente por qué una respuesta de estudio es correcta o incorrecta."
+            "El feedback debe ser breve (2-4 frases), didáctico y en español."
+            if needs.contains("adhd") {
+                "IMPORTANTE (TDAH): sé directo y conciso. Si algo estuvo bien, menciona primero eso."
+            }
+            if needs.contains("autism") {
+                "IMPORTANTE (Autismo): usa lenguaje directo y concreto. Sin metáforas ni ambigüedad."
+            }
+        }
+
+        let session = LanguageModelSession(instructions: instructions)
+
+        let verdict = isCorrect ? "CORRECTA" : "INCORRECTA"
+        let errorHint = errorType.map { " (tipo de error: \($0))" } ?? ""
+        let prompt = """
+        Pregunta: \(question)
+        Respuesta modelo: \(correctAnswer)
+        Respuesta del estudiante: \(userAnswer ?? "")
+        Veredicto: \(verdict)\(errorHint)
+
+        Explica brevemente por qué la respuesta es \(verdict.lowercased()) y qué debería recordar el estudiante.
+        """
+
+        fmLog("generateAnswerFeedback", "→ prompt=\(prompt.count)chars")
+
+        return try await executeGeneration(tag: "generateAnswerFeedback") {
+            try await session.respond(to: prompt, generating: GeneratedAnswerFeedback.self)
+        } transform: { response in
+            fmLog("generateAnswerFeedback", "✅ \(response.content.feedback.count)chars")
+            return response.content.feedback
         }
     }
 

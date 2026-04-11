@@ -1,53 +1,52 @@
 import SwiftUI
 
+// MARK: - Full-screen podcast player
+
 struct StudyPodcastPlayerView: View {
-    @StateObject private var viewModel: StudyPodcastPlayerViewModel
-    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var podcastState: PodcastPlayerState
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-    init(study: SDStudy) {
-        _viewModel = StateObject(wrappedValue: StudyPodcastPlayerViewModel(study: study))
-    }
-
+    private var vm: StudyPodcastPlayerViewModel? { podcastState.activePlayer }
     private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
 
     var body: some View {
         ZStack {
             backgroundGradient.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                header
-                Spacer(minLength: 16)
-                coverArt
-                Spacer(minLength: 24)
-                sectionInfo
-                Spacer(minLength: 16)
-                progressBar
-                Spacer(minLength: 20)
-                controls
-                Spacer(minLength: 12)
-                speedPicker
-                Spacer(minLength: 8)
+            if let vm {
+                VStack(spacing: 0) {
+                    header(vm: vm)
+                    Spacer(minLength: 16)
+                    coverArt(vm: vm)
+                    Spacer(minLength: 24)
+                    sectionInfo(vm: vm)
+                    Spacer(minLength: 16)
+                    progressBar(vm: vm)
+                    Spacer(minLength: 20)
+                    controls(vm: vm)
+                    Spacer(minLength: 12)
+                    speedPicker(vm: vm)
+                    Spacer(minLength: 8)
+                }
+                .frame(maxWidth: isLargeCanvas ? 480 : .infinity)
+                .padding(.horizontal, isLargeCanvas ? 32 : 24)
+                .padding(.vertical, 16)
             }
-            .frame(maxWidth: isLargeCanvas ? 480 : .infinity)
-            .padding(.horizontal, isLargeCanvas ? 32 : 24)
-            .padding(.vertical, 16)
         }
-        .onDisappear { viewModel.stop() }
     }
 
     // MARK: - Header
 
-    private var header: some View {
+    private func header(vm: StudyPodcastPlayerViewModel) -> some View {
         HStack {
-            Button { dismiss() } label: {
+            Button { podcastState.dismiss() } label: {
                 Image(systemName: "chevron.down")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.8))
                     .frame(width: 40, height: 40)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Cerrar reproductor")
+            .accessibilityLabel("Minimizar reproductor")
 
             Spacer()
 
@@ -56,7 +55,7 @@ struct StudyPodcastPlayerView: View {
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.5))
                     .tracking(0.8)
-                Text(viewModel.study.title)
+                Text(vm.study.title)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.9))
                     .lineLimit(1)
@@ -64,14 +63,20 @@ struct StudyPodcastPlayerView: View {
 
             Spacer()
 
-            // Placeholder for symmetry
-            Color.clear.frame(width: 40, height: 40)
+            Button { podcastState.close() } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.white.opacity(0.5))
+                    .frame(width: 40, height: 40)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Cerrar podcast")
         }
     }
 
     // MARK: - Cover
 
-    private var coverArt: some View {
+    private func coverArt(vm: StudyPodcastPlayerViewModel) -> some View {
         RoundedRectangle(cornerRadius: isLargeCanvas ? 16 : 12, style: .continuous)
             .fill(
                 LinearGradient(
@@ -85,17 +90,17 @@ struct StudyPodcastPlayerView: View {
                     Image(systemName: "waveform")
                         .font(.system(size: isLargeCanvas ? 56 : 44, weight: .light))
                         .foregroundStyle(.white.opacity(0.6))
-                        .symbolEffect(.variableColor.iterative, isActive: viewModel.isPlaying)
+                        .symbolEffect(.variableColor.iterative, isActive: vm.isPlaying)
 
-                    Text(viewModel.study.title)
+                    Text(vm.study.title)
                         .font(isLargeCanvas ? .title2.weight(.bold) : .title3.weight(.bold))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
                         .lineLimit(3)
                         .padding(.horizontal, 20)
 
-                    if viewModel.estimatedMinutes > 0 {
-                        Text("\(viewModel.estimatedMinutes) min aprox.")
+                    if vm.estimatedMinutes > 0 {
+                        Text("\(vm.estimatedMinutes) min aprox.")
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.55))
                     }
@@ -108,16 +113,16 @@ struct StudyPodcastPlayerView: View {
 
     // MARK: - Section info
 
-    private var sectionInfo: some View {
+    private func sectionInfo(vm: StudyPodcastPlayerViewModel) -> some View {
         VStack(spacing: 6) {
-            Text(viewModel.currentSection?.title ?? "")
+            Text(vm.currentSection?.title ?? "")
                 .font(.title3.weight(.bold))
                 .foregroundStyle(.white)
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
-                .animation(.easeInOut(duration: 0.2), value: viewModel.currentSectionIndex)
+                .animation(.easeInOut(duration: 0.2), value: vm.currentSectionIndex)
 
-            Text("Seccion \(viewModel.sectionLabel)")
+            Text("Seccion \(vm.sectionLabel)")
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.5))
         }
@@ -126,7 +131,7 @@ struct StudyPodcastPlayerView: View {
 
     // MARK: - Progress
 
-    private var progressBar: some View {
+    private func progressBar(vm: StudyPodcastPlayerViewModel) -> some View {
         VStack(spacing: 6) {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -134,77 +139,52 @@ struct StudyPodcastPlayerView: View {
                         .fill(Color.white.opacity(0.15))
                     Capsule()
                         .fill(Color.white.opacity(0.85))
-                        .frame(width: max(4, geo.size.width * viewModel.progress))
+                        .frame(width: max(4, geo.size.width * vm.progress))
                 }
             }
             .frame(height: 4)
-            .animation(.linear(duration: 0.15), value: viewModel.progress)
+            .animation(.linear(duration: 0.15), value: vm.progress)
 
             HStack {
-                Text(sectionProgressLabel)
+                Text("\(Int(vm.progress * 100))%")
                     .font(.caption2)
                     .foregroundStyle(.white.opacity(0.45))
                 Spacer()
-                Text("\(viewModel.sections.count) secciones")
+                Text("\(vm.sections.count) secciones")
                     .font(.caption2)
                     .foregroundStyle(.white.opacity(0.45))
             }
         }
     }
 
-    private var sectionProgressLabel: String {
-        let pct = Int(viewModel.progress * 100)
-        return "\(pct)%"
-    }
+    // MARK: - Controls (play/pause + next only)
 
-    // MARK: - Controls
-
-    private var controls: some View {
-        HStack(spacing: isLargeCanvas ? 48 : 36) {
-            Button { viewModel.previous() } label: {
-                Image(systemName: "backward.fill")
-                    .font(.title2)
-                    .foregroundStyle(viewModel.hasPrevious ? .white : .white.opacity(0.25))
-            }
-            .buttonStyle(.plain)
-            .disabled(!viewModel.hasPrevious)
-            .accessibilityLabel("Seccion anterior")
-
-            Button { viewModel.togglePlayPause() } label: {
-                Image(systemName: viewModel.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: isLargeCanvas ? 72 : 64))
-                    .foregroundStyle(.white)
-                    .contentTransition(.symbolEffect(.replace))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(viewModel.isPlaying ? "Pausar" : "Reproducir")
-
-            Button { viewModel.next() } label: {
-                Image(systemName: "forward.fill")
-                    .font(.title2)
-                    .foregroundStyle(viewModel.hasNext ? .white : .white.opacity(0.25))
-            }
-            .buttonStyle(.plain)
-            .disabled(!viewModel.hasNext)
-            .accessibilityLabel("Siguiente seccion")
+    private func controls(vm: StudyPodcastPlayerViewModel) -> some View {
+        Button { vm.togglePlayPause() } label: {
+            Image(systemName: vm.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                .font(.system(size: isLargeCanvas ? 72 : 64))
+                .foregroundStyle(.white)
+                .contentTransition(.symbolEffect(.replace))
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(vm.isPlaying ? "Pausar" : "Reproducir")
     }
 
     // MARK: - Speed
 
-    private var speedPicker: some View {
+    private func speedPicker(vm: StudyPodcastPlayerViewModel) -> some View {
         HStack(spacing: 12) {
             ForEach(speedOptions, id: \.self) { rate in
                 Button {
-                    viewModel.setRate(rate)
+                    vm.setRate(rate)
                 } label: {
                     Text(speedLabel(rate))
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(viewModel.playbackRate == rate ? .white : .white.opacity(0.4))
+                        .foregroundStyle(vm.playbackRate == rate ? .white : .white.opacity(0.4))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(
-                            Capsule().fill(viewModel.playbackRate == rate ? Color.white.opacity(0.18) : Color.clear)
+                            Capsule().fill(vm.playbackRate == rate ? Color.white.opacity(0.18) : Color.clear)
                         )
                 }
                 .buttonStyle(.plain)
@@ -234,5 +214,72 @@ struct StudyPodcastPlayerView: View {
             startPoint: .top,
             endPoint: .bottom
         )
+    }
+}
+
+// MARK: - Mini player bar (overlay at bottom of app)
+
+struct PodcastMiniPlayerBar: View {
+    @EnvironmentObject private var podcastState: PodcastPlayerState
+
+    var body: some View {
+        if let vm = podcastState.activePlayer, !podcastState.isFullPlayerPresented {
+            Button {
+                podcastState.isFullPlayerPresented = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "waveform")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.aeroLavender)
+                        .symbolEffect(.variableColor.iterative, isActive: vm.isPlaying)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(vm.currentSection?.title ?? vm.study.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                        Text(vm.study.title)
+                            .font(.caption2)
+                            .foregroundStyle(.white.opacity(0.55))
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    Button {
+                        vm.togglePlayPause()
+                    } label: {
+                        Image(systemName: vm.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 36, height: 36)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(vm.isPlaying ? "Pausar" : "Reproducir")
+
+                    Button {
+                        podcastState.close()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Cerrar podcast")
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color(red: 0.10, green: 0.12, blue: 0.28))
+                        .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
+                )
+                .padding(.horizontal, 12)
+            }
+            .buttonStyle(.plain)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: podcastState.isActive)
+        }
     }
 }

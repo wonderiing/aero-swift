@@ -25,6 +25,9 @@ final class PracticeSessionViewModel: ObservableObject {
     @Published var lastEvaluationUsedAppleIntelligence = false
     @Published var consecutiveCorrectStreak = 0
 
+    @Published var generatedFeedback: String?
+    @Published var isFetchingFeedback = false
+
     var modelContext: ModelContext?
 
     init(study: SDStudy) {
@@ -74,6 +77,7 @@ final class PracticeSessionViewModel: ObservableObject {
         evaluationResult = nil
         isShowingAnswer = false
         expandedExplanation = nil
+        generatedFeedback = nil
         lastEvaluationUsedAppleIntelligence = false
         guard currentIndex < flashcards.count else {
             shuffledOptions = []
@@ -180,6 +184,29 @@ final class PracticeSessionViewModel: ObservableObject {
         }
     }
 
+    func generateFeedback() async {
+        guard currentIndex < flashcards.count, let ev = evaluationResult else { return }
+        isFetchingFeedback = true
+        defer { isFetchingFeedback = false }
+
+        if IntelligentStudyAssistant.isAppleIntelligenceReady {
+            let card = flashcards[currentIndex]
+            do {
+                generatedFeedback = try await IntelligentStudyAssistant.generateAnswerFeedback(
+                    question: card.question,
+                    correctAnswer: card.answer,
+                    userAnswer: answerTextForEvaluation(card: card),
+                    isCorrect: ev.isCorrect,
+                    errorType: ev.errorTypeRaw
+                )
+            } catch {
+                generatedFeedback = "No se pudo generar la explicación: \(error.localizedDescription)"
+            }
+        } else {
+            generatedFeedback = "Activa Apple Intelligence en este dispositivo para ver la explicación."
+        }
+    }
+
     func explainMore() async {
         guard currentIndex < flashcards.count else { return }
         let card = flashcards[currentIndex]
@@ -192,7 +219,7 @@ final class PracticeSessionViewModel: ObservableObject {
                     question: card.question,
                     correctAnswer: card.answer,
                     userAnswer: answerTextForEvaluation(card: card),
-                    feedbackSoFar: evaluationResult?.feedback,
+                    feedbackSoFar: generatedFeedback,
                     resourceContext: nil
                 )
             } catch {

@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct AppRootView: View {
+    @StateObject private var podcastState = PodcastPlayerState()
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     @AppStorage("textSize") private var textSize: String = "normal" // normal | large | extraLarge
     @AppStorage("accessibilityNeeds") private var accessibilityNeeds: String = ""
@@ -50,13 +51,23 @@ struct AppRootView: View {
     }
 
     var body: some View {
-        Group {
-            if hasCompletedOnboarding {
-                StudyListView()
-            } else {
-                OnboardingFlowView()
+        ZStack(alignment: .bottom) {
+            Group {
+                if hasCompletedOnboarding {
+                    StudyListView()
+                } else {
+                    OnboardingFlowView()
+                }
             }
+
+            PodcastMiniPlayerBar()
+                .padding(.bottom, 4)
         }
+        .fullScreenCover(isPresented: $podcastState.isFullPlayerPresented) {
+            StudyPodcastPlayerView()
+                .environmentObject(podcastState)
+        }
+        .environmentObject(podcastState)
         .preferredColorScheme(preferredColorScheme)
         .tint(Color.aeroNavy)
         .modifier(DynamicTypeOverride(dynamicType: effectiveDynamicType))
