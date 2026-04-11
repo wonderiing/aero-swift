@@ -70,6 +70,7 @@ struct SettingsView: View {
                 ForEach(sessionOptions) { opt in
                     MultipleSelectionRow(
                         title: opt.title,
+                        subtitle: opt.subtitle,
                         systemImage: opt.systemImage,
                         isSelected: selectedSession.contains(opt.key)
                     ) {
@@ -79,13 +80,14 @@ struct SettingsView: View {
             } header: {
                 Label("Estilo de estudio", systemImage: "slider.horizontal.3")
             } footer: {
-                Text("La app adapta sesiones y sugerencias según lo que marques. Puedes combinar varias opciones.")
+                Text("Puedes combinar varias opciones. La app ajusta el número de tarjetas, el tipo de preguntas y el formato del contenido.")
             }
 
             Section {
                 ForEach(accessibilityOptions) { opt in
                     MultipleSelectionRow(
                         title: opt.title,
+                        subtitle: opt.subtitle,
                         systemImage: opt.systemImage,
                         isSelected: selectedAccessibility.contains(opt.key)
                     ) {
@@ -93,9 +95,9 @@ struct SettingsView: View {
                     }
                 }
             } header: {
-                Label("Accesibilidad", systemImage: "accessibility")
+                Label("¿Cómo aprendes mejor?", systemImage: "accessibility")
             } footer: {
-                Text("Estas preferencias ayudan a ajustar contraste, movimiento y tamaño de texto cuando tiene sentido.")
+                Text("Usamos estas preferencias para adaptar el lenguaje, el ritmo y el formato del contenido generado con IA.")
             }
 
             Section {
@@ -133,7 +135,7 @@ struct SettingsView: View {
             } header: {
                 Label("Apariencia", systemImage: "sparkles")
             } footer: {
-                Text("Modo oscuro forzado solo afecta a esta app. «Sistema» sigue el tema de iPad, iPhone o Mac.")
+                Text("El tema solo afecta a esta app — «Sistema» sigue el ajuste de iOS/iPadOS. Modo Focus oculta distracciones visuales durante el estudio.")
             }
         }
         .navigationTitle("Configuración")
@@ -212,38 +214,48 @@ private struct SettingsOption: Identifiable {
     let key: String
     let systemImage: String
     let title: String
+    var subtitle: String? = nil
 }
 
 private let sessionOptions: [SettingsOption] = [
-    .init(key: "short_sessions", systemImage: "timer", title: "Sesiones cortas"),
-    .init(key: "long_sessions", systemImage: "book.fill", title: "Sesiones largas"),
-    .init(key: "prefer_audio", systemImage: "headphones", title: "Prefiero escuchar"),
-    .init(key: "prefer_writing", systemImage: "pencil", title: "Prefiero escribir")
+    .init(key: "short_sessions",  systemImage: "timer",     title: "Sesiones cortas",    subtitle: "Máximo 10 tarjetas por sesión"),
+    .init(key: "long_sessions",   systemImage: "book.fill", title: "Sesiones largas",    subtitle: "Sin límite — repasa todo lo pendiente de una vez"),
+    .init(key: "prefer_audio",    systemImage: "headphones",title: "Prefiero escuchar",  subtitle: "Activa el podcast automáticamente al abrir un estudio"),
+    .init(key: "prefer_writing",  systemImage: "pencil",    title: "Prefiero escribir",  subtitle: "Prioriza preguntas de respuesta abierta sobre opción múltiple")
 ]
 
 private let accessibilityOptions: [SettingsOption] = [
-    .init(key: "adhd", systemImage: "brain.head.profile", title: "TDAH"),
-    .init(key: "autism", systemImage: "figure.mind.and.body", title: "Autismo"),
-    .init(key: "dyslexia", systemImage: "text.book.closed", title: "Dislexia"),
-    .init(key: "low_vision", systemImage: "eye", title: "Baja visión")
+    .init(key: "adhd",       systemImage: "brain.head.profile",    title: "Me cuesta mantener el foco",                subtitle: "Feedbacks más cortos y directos, sesiones más breves"),
+    .init(key: "autism",     systemImage: "figure.mind.and.body",  title: "Prefiero instrucciones claras y literales",  subtitle: "El contenido evitará metáforas, sarcasmo y lenguaje ambiguo"),
+    .init(key: "dyslexia",   systemImage: "text.book.closed",      title: "Leer texto seguido me resulta difícil",      subtitle: "Se activa el modo podcast para escuchar los recursos"),
+    .init(key: "low_vision", systemImage: "eye",                   title: "Tengo dificultad con texto pequeño",         subtitle: "Aumenta el tamaño de texto y el contraste en la app")
 ]
 
 private struct MultipleSelectionRow: View {
     let title: String
+    var subtitle: String? = nil
     let systemImage: String
     let isSelected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Image(systemName: systemImage)
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(.secondary)
                     .frame(width: 24, alignment: .center)
-                Text(title)
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.leading)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.leading)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.leading)
+                    }
+                }
                 Spacer()
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
@@ -252,7 +264,7 @@ private struct MultipleSelectionRow: View {
                 }
             }
             .contentShape(Rectangle())
-            .padding(.vertical, 6)
+            .padding(.vertical, subtitle != nil ? 8 : 6)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)

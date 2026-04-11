@@ -13,8 +13,8 @@ struct PracticeSessionView: View {
     @AppStorage("accessibilityNeeds") private var accessibilityNeeds: String = ""
     @AppStorage("focusMode") private var focusMode: Bool = false
 
-    init(study: SDStudy) {
-        _viewModel = StateObject(wrappedValue: PracticeSessionViewModel(study: study))
+    init(study: SDStudy, practiceAll: Bool = false) {
+        _viewModel = StateObject(wrappedValue: PracticeSessionViewModel(study: study, practiceAll: practiceAll))
     }
 
     private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }

@@ -811,18 +811,17 @@ enum IntelligentStudyAssistant {
 
         let instructions = Instructions {
             "Eres un tutor justo que evalúa respuestas de estudio en español."
-            "Evalúas si el estudiante demuestra comprensión del tema de la pregunta, no si copió la redacción modelo."
-            "CRÍTICO — respuestas que NO cuentan como intento válido: texto sin relación con la pregunta, broma, relleno, slang evasivo (p. ej. \"nvm\", \"random\", \"lo que sea\"), o negaciones sin explicar (p. ej. solo \"no sé\" / \"ni idea\" sin ningún contenido sobre el tema). En todos esos casos: isCorrect=false, errorTypeToken=conceptual (o confusion si aplica), NUNCA uses incompleto."
-            "incompleto SOLO cuando isCorrect=true: la respuesta SÍ trata el tema de la pregunta pero le faltan matices o ideas importantes. Si no trata el tema, no es incompleto — es incorrecta."
+            "Tu criterio principal: ¿el estudiante demuestra que entiende el concepto que se pregunta? No importa si la redacción es diferente a la respuesta modelo, imprecisa o incompleta — si la idea central es correcta, la respuesta es correcta."
+            "RESPUESTAS AMBIGUAS: si la respuesta es ambigua pero contiene la idea correcta o una aproximación válida al tema, márcala como isCorrect=true con errorTypeToken=incompleto. Solo marca isCorrect=false si la respuesta está claramente equivocada o no tiene relación con el tema."
             "JERARQUÍA DE EVALUACIÓN (aplica en este orden):"
-            "0. ¿La respuesta ignora el enunciado, es irrelevante o es evasiva sin sustancia? → isCorrect=false, errorTypeToken=conceptual."
-            "1. ¿Afirma algo claramente erróneo sobre el tema? → isCorrect=false, errorTypeToken=conceptual o confusion."
-            "2. ¿Aborda el tema y es razonablemente correcta pero le faltan ideas clave? → isCorrect=true, errorTypeToken=incompleto, missingConcepts."
-            "3. ¿Aborda el tema y es adecuada? → isCorrect=true, errorTypeToken vacío."
-            "Si dudas entre \"no intentó responder\" e \"incompleto\", elige \"no intentó\" (isCorrect=false). Sé exigente con la relevancia."
-            "El feedback siempre constructivo y en español: si es incorrecta o irrelevante, di con claridad que debe responder al contenido de la pregunta."
+            "0. ¿La respuesta es completamente irrelevante, es broma, relleno o slang sin contenido (p. ej. 'nvm', 'lo que sea', 'no sé' sin nada más)? → isCorrect=false, errorTypeToken=conceptual."
+            "1. ¿Afirma algo claramente erróneo o contradictorio sobre el tema? → isCorrect=false, errorTypeToken=conceptual o confusion."
+            "2. ¿La respuesta es ambigua, incompleta o imprecisa pero toca el tema correctamente? → isCorrect=true, errorTypeToken=incompleto, rellena missingConcepts con lo que faltó."
+            "3. ¿La respuesta aborda el tema y es sustancialmente correcta? → isCorrect=true, errorTypeToken vacío."
+            "REGLA DE BENEFICIO DE DUDA: si dudas entre isCorrect=true y isCorrect=false, elige isCorrect=true con errorTypeToken=incompleto. Solo marca isCorrect=false cuando estés seguro de que la respuesta es incorrecta o irrelevante."
+            "incompleto puede usarse con isCorrect=true. NUNCA uses incompleto con isCorrect=false."
             if needs.contains("adhd") {
-                "IMPORTANTE (TDAH): el feedback breve y directo. Si la respuesta sí aborda el tema, puedes empezar con algo que hizo bien. Si es irrelevante o evasiva, no inventes elogios: di qué se pedía y anima a intentarlo."
+                "IMPORTANTE (TDAH): el feedback breve y directo. Empieza con lo que hizo bien antes de señalar lo que faltó."
             }
             if needs.contains("autism") {
                 "IMPORTANTE (Autismo): usa lenguaje directo y concreto. Evita metáforas, sarcasmo o lenguaje ambiguo. Di exactamente qué faltó."
@@ -844,7 +843,7 @@ enum IntelligentStudyAssistant {
         \(optText)
         Respuesta del estudiante: \(userAnswer ?? "")
 
-        Criterio: si la respuesta no intenta responder al tema de la pregunta (irrelevante, evasiva o sin sustancia), isCorrect=false; no uses "incompleto" salvo que sí aborde el tema pero le falte profundidad.
+        Recuerda: si la respuesta toca el tema aunque sea de forma ambigua o incompleta, es isCorrect=true con incompleto. Solo isCorrect=false si está claramente equivocada o es irrelevante.
         """
 
         fmLog("evaluateAnswer", "→ prompt=\(prompt.count)chars")

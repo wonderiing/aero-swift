@@ -29,9 +29,11 @@ final class PracticeSessionViewModel: ObservableObject {
     @Published var isFetchingFeedback = false
 
     var modelContext: ModelContext?
+    private let practiceAll: Bool
 
-    init(study: SDStudy) {
+    init(study: SDStudy, practiceAll: Bool = false) {
         self.study = study
+        self.practiceAll = practiceAll
     }
 
     func startSession() {
@@ -40,13 +42,19 @@ final class PracticeSessionViewModel: ObservableObject {
         sessionAnsweredCount = 0
         consecutiveCorrectStreak = 0
 
-        let now = Date()
-        let queue = study.flashcards
-            .filter { $0.nextReviewAt <= now }
-            .sorted { $0.nextReviewAt < $1.nextReviewAt }
+        let queue: [SDFlashcard]
+        if practiceAll {
+            // Modo libre: todas las tarjetas mezcladas, ignorando SM-2
+            queue = study.flashcards.shuffled()
+        } else {
+            let now = Date()
+            queue = study.flashcards
+                .filter { $0.nextReviewAt <= now }
+                .sorted { $0.nextReviewAt < $1.nextReviewAt }
+        }
 
         let analysis = GapAnalysis.compute(flashcards: study.flashcards)
-        let prioritized = prioritizeQueue(queue, gaps: analysis)
+        let prioritized = practiceAll ? queue : prioritizeQueue(queue, gaps: analysis)
         flashcards = applySessionStyleLimits(to: prioritized)
         currentIndex = 0
         prepareCurrentCard()

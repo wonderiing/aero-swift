@@ -20,10 +20,10 @@ struct AnkiSessionView: View {
 
     private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
 
-    init(viewModel: StudyDetailViewModel) {
+    init(viewModel: StudyDetailViewModel, forceAll: Bool = false) {
         self.viewModel = viewModel
         let due = viewModel.ankiReviewQueue
-        if due.isEmpty {
+        if forceAll || due.isEmpty {
             _queue = State(initialValue: viewModel.ankiCards.shuffled())
             _isFreeSession = State(initialValue: true)
         } else {
