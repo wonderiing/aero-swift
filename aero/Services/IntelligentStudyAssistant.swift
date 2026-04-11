@@ -152,7 +152,8 @@ enum IntelligentStudyAssistant {
         totalChunks: Int
     ) async throws -> [EditableFlashcard] {
         let rawNeeds = UserDefaults.standard.string(forKey: "accessibilityNeeds") ?? ""
-        let needs = Set(rawNeeds.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+        let acc = AccessibilityNeeds(rawNeeds)
+        let profileExtra = PromptBuilder.instructionFragments(for: acc, role: .flashcardGeneration).joined(separator: "\n\n")
 
         let instructions = Instructions {
             "Eres un docente experto en diseño instruccional. Tu objetivo es crear flashcards que desarrollen comprensión profunda, no memorización superficial."
@@ -163,8 +164,8 @@ enum IntelligentStudyAssistant {
             "4. La respuesta modelo debe ser didáctica: incluye el 'por qué' o el mecanismo, no solo el dato."
             "OBLIGATORIO: mezcla cardKind. Al menos el 50% deben ser 'open'. Alterna explícitamente entre tipos; nunca generes solo 'multiple_choice'."
             "sourceResourceTitle debe ser copia exacta del título del recurso en la lista RECURSOS."
-            if needs.contains("dyslexia") {
-                "IMPORTANTE (Dislexia): las preguntas deben ser cortas y directas. Evita oraciones compuestas largas."
+            if !profileExtra.isEmpty {
+                profileExtra
             }
         }
 
@@ -392,6 +393,10 @@ enum IntelligentStudyAssistant {
         chunkIndex: Int,
         totalChunks: Int
     ) async throws -> [EditableAnkiCard] {
+        let rawNeeds = UserDefaults.standard.string(forKey: "accessibilityNeeds") ?? ""
+        let acc = AccessibilityNeeds(rawNeeds)
+        let profileExtra = PromptBuilder.instructionFragments(for: acc, role: .ankiGeneration).joined(separator: "\n\n")
+
         let instructions = Instructions {
             "Eres un experto en aprendizaje espaciado estilo Anki con dominio en didáctica y ciencias cognitivas."
             "PRINCIPIO FUNDAMENTAL: cada tarjeta debe pasar el 'test del buen Anki': el estudiante debe poder decir en <1 segundo si sabe o no sabe la respuesta al leer el frente."
@@ -423,6 +428,9 @@ enum IntelligentStudyAssistant {
             "— NUNCA: datos triviales, ejemplos decorativos, información periférica"
             ""
             "sourceResourceTitle debe ser copia exacta del título del recurso en la lista RECURSOS."
+            if !profileExtra.isEmpty {
+                profileExtra
+            }
         }
 
         let session = LanguageModelSession(instructions: instructions)
@@ -559,6 +567,10 @@ enum IntelligentStudyAssistant {
         chunkIndex: Int,
         totalChunks: Int
     ) async throws -> [EditableFlashcard] {
+        let rawNeeds = UserDefaults.standard.string(forKey: "accessibilityNeeds") ?? ""
+        let acc = AccessibilityNeeds(rawNeeds)
+        let profileExtra = PromptBuilder.instructionFragments(for: acc, role: .gapGeneration).joined(separator: "\n\n")
+
         let instructions = Instructions {
             "Eres un tutor experto en refuerzo de aprendizaje. Tu objetivo es crear flashcards para CORREGIR lagunas de conocimiento específicas del estudiante."
             "REGLAS:"
@@ -567,6 +579,9 @@ enum IntelligentStudyAssistant {
             "3. Mezcla tipos: al menos 50% abiertas ('open'). Las preguntas deben invitar a razonar, no solo a recordar."
             "4. La respuesta modelo debe ser didáctica y corregir directamente el error típico."
             "5. sourceResourceTitle debe ser copia exacta del título del recurso en la lista RECURSOS."
+            if !profileExtra.isEmpty {
+                profileExtra
+            }
         }
 
         let session = LanguageModelSession(instructions: instructions)
@@ -626,7 +641,8 @@ enum IntelligentStudyAssistant {
         }
 
         let rawNeeds = UserDefaults.standard.string(forKey: "accessibilityNeeds") ?? ""
-        let needs = Set(rawNeeds.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+        let acc = AccessibilityNeeds(rawNeeds)
+        let profileExtra = PromptBuilder.instructionFragments(for: acc, role: .evaluation).joined(separator: "\n\n")
 
         let instructions = Instructions {
             "Eres un tutor benevolente que evalúa respuestas de estudio en español."
@@ -638,11 +654,8 @@ enum IntelligentStudyAssistant {
             "2. ¿La respuesta es correcta pero le faltan ideas clave? → isCorrect=true, errorTypeToken=incompleto, lista missingConcepts."
             "3. ¿La respuesta es correcta y completa? → isCorrect=true, errorTypeToken vacío."
             "El feedback siempre debe ser constructivo y en español. Si es correcto, refuerza lo que hizo bien. Si es incompleto, explica qué faltó. Si es incorrecto, corrige con amabilidad."
-            if needs.contains("adhd") {
-                "IMPORTANTE (TDAH): el feedback debe ser breve, directo y comenzar reconociendo lo que el estudiante hizo bien antes de señalar errores."
-            }
-            if needs.contains("autism") {
-                "IMPORTANTE (Autismo): usa lenguaje directo y concreto. Evita metáforas, sarcasmo o lenguaje ambiguo. Di exactamente qué faltó."
+            if !profileExtra.isEmpty {
+                profileExtra
             }
         }
 
@@ -701,8 +714,15 @@ enum IntelligentStudyAssistant {
             }
         }
 
+        let rawNeeds = UserDefaults.standard.string(forKey: "accessibilityNeeds") ?? ""
+        let acc = AccessibilityNeeds(rawNeeds)
+        let profileExtra = PromptBuilder.instructionFragments(for: acc, role: .expandExplanation).joined(separator: "\n\n")
+
         let instructions = Instructions {
             "Explicas conceptos a un estudiante en español con claridad y sin inventar fuera del contexto dado."
+            if !profileExtra.isEmpty {
+                profileExtra
+            }
         }
 
         let session = LanguageModelSession(instructions: instructions)

@@ -69,6 +69,7 @@ struct SettingsView: View {
                 ForEach(sessionOptions) { opt in
                     MultipleSelectionRow(
                         title: opt.title,
+                        subtitle: opt.detail,
                         systemImage: opt.systemImage,
                         isSelected: selectedSession.contains(opt.key)
                     ) {
@@ -78,13 +79,14 @@ struct SettingsView: View {
             } header: {
                 Label("Estilo de estudio", systemImage: "slider.horizontal.3")
             } footer: {
-                Text("La app adapta sesiones y sugerencias según lo que marques. Puedes combinar varias opciones.")
+                Text("La app adapta el tamaño de la sesión y las sugerencias. Puedes combinar varias opciones; los cambios se aplican en la siguiente práctica.")
             }
 
             Section {
                 ForEach(accessibilityOptions) { opt in
                     MultipleSelectionRow(
                         title: opt.title,
+                        subtitle: opt.detail,
                         systemImage: opt.systemImage,
                         isSelected: selectedAccessibility.contains(opt.key)
                     ) {
@@ -94,7 +96,7 @@ struct SettingsView: View {
             } header: {
                 Label("Accesibilidad", systemImage: "accessibility")
             } footer: {
-                Text("Estas preferencias ayudan a ajustar contraste, movimiento y tamaño de texto cuando tiene sentido.")
+                Text("Cada opción activa ajustes en la práctica, la IA (tono y formato del feedback) y la interfaz. Puedes cambiarlas cuando quieras; abajo, «Reducir movimiento» y el tamaño de texto también afectan a toda la app.")
             }
 
             Section {
@@ -179,9 +181,14 @@ struct SettingsView: View {
     }
 
     private func toggleAccessibility(_ key: String) {
+        let hadADHD = selectedAccessibility.contains("adhd")
         var s = selectedAccessibility
         if s.contains(key) { s.remove(key) } else { s.insert(key) }
         accessibilityNeeds = toCSV(Array(s))
+        let nowADHD = s.contains("adhd")
+        if !hadADHD, nowADHD {
+            focusMode = true
+        }
         syncProfile()
     }
 
@@ -208,55 +215,99 @@ struct SettingsView: View {
 }
 
 private struct SettingsOption: Identifiable {
-    let id = UUID()
     let key: String
     let systemImage: String
     let title: String
+    /// Texto secundario: qué cambia en la app al activar esta opción.
+    let detail: String?
+
+    var id: String { key }
 }
 
 private let sessionOptions: [SettingsOption] = [
-    .init(key: "short_sessions", systemImage: "timer", title: "Sesiones cortas"),
-    .init(key: "long_sessions", systemImage: "book.fill", title: "Sesiones largas"),
-    .init(key: "prefer_audio", systemImage: "headphones", title: "Prefiero escuchar"),
-    .init(key: "prefer_writing", systemImage: "pencil", title: "Prefiero escribir")
+    .init(key: "short_sessions", systemImage: "timer", title: "Sesiones cortas", detail: "Limita la cola de práctica para encajar en descansos breves."),
+    .init(key: "long_sessions", systemImage: "book.fill", title: "Sesiones largas", detail: "Repasa más tarjetas seguidas cuando haya material pendiente."),
+    .init(key: "prefer_audio", systemImage: "headphones", title: "Prefiero escuchar", detail: "Indica preferencia por voz; la app puede priorizar controles de audio donde ya existan."),
+    .init(key: "prefer_writing", systemImage: "pencil", title: "Prefiero escribir", detail: "Indica preferencia por texto al responder cuando haya varias formas de practicar.")
 ]
 
 private let accessibilityOptions: [SettingsOption] = [
-    .init(key: "adhd", systemImage: "brain.head.profile", title: "TDAH"),
-    .init(key: "autism", systemImage: "figure.mind.and.body", title: "Autismo"),
-    .init(key: "dyslexia", systemImage: "text.book.closed", title: "Dislexia"),
-    .init(key: "low_vision", systemImage: "eye", title: "Baja visión")
+    .init(
+        key: "adhd",
+        systemImage: "brain.head.profile",
+        title: "TDAH",
+        detail: "Sesión en bloques cortos con pausas, modo foco recomendado, racha visible, tiempo invertido (no cuenta atrás), feedback breve y una sola corrección prioritaria por respuesta. La IA adapta tono y longitud."
+    ),
+    .init(
+        key: "autism",
+        systemImage: "figure.mind.and.body",
+        title: "Autismo (TEA)",
+        detail: "Rutina y aviso antes de practicar, menos presión temporal, feedback con formato fijo y lenguaje literal, sin dependencia del color para acierto/error. La IA evita ironía y metáforas."
+    ),
+    .init(
+        key: "dyslexia",
+        systemImage: "text.book.closed",
+        title: "Dislexia",
+        detail: "Preguntas más cortas al generar tarjetas, tipografía y espaciado más legibles, énfasis en audio y lectura del feedback. La IA usa frases simples."
+    ),
+    .init(
+        key: "low_vision",
+        systemImage: "eye",
+        title: "Baja visión",
+        detail: "Texto y controles más grandes por defecto y más contraste donde la app ya lo aplica; sigue respetando el tamaño de letra del sistema."
+    )
 ]
 
 private struct MultipleSelectionRow: View {
     let title: String
+    let subtitle: String?
     let systemImage: String
     let isSelected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
                 Image(systemName: systemImage)
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(.secondary)
                     .frame(width: 24, alignment: .center)
-                Text(title)
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.leading)
-                Spacer()
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.leading)
+                    if let subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer(minLength: 8)
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.tint)
                         .fontWeight(.semibold)
+                        .padding(.top, 2)
                 }
             }
             .contentShape(Rectangle())
             .padding(.vertical, 6)
+            .frame(minHeight: 44)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(title)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityCombinedLabel)
         .accessibilityValue(isSelected ? "Activado" : "Desactivado")
+        .accessibilityHint("Doble toque para cambiar. Double tap to toggle.")
+    }
+
+    private var accessibilityCombinedLabel: String {
+        if let subtitle, !subtitle.isEmpty {
+            return "\(title). \(subtitle)"
+        }
+        return title
     }
 }
 

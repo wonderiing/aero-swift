@@ -68,10 +68,30 @@ struct OnboardingFlowView: View {
                         isLargeCanvas: isLargeCanvas,
                         columns: 1,
                         options: [
-                            .init(key: "adhd", systemImage: "brain.head.profile", title: "Tengo TDAH", subtitle: "Me cuesta mantener el foco por mucho tiempo"),
-                            .init(key: "autism", systemImage: "figure.mind.and.body", title: "Estoy en el espectro autista", subtitle: "Prefiero interfaces predecibles y lenguaje claro"),
-                            .init(key: "dyslexia", systemImage: "text.book.closed", title: "Tengo dislexia", subtitle: "Me cuesta leer textos largos"),
-                            .init(key: "low_vision", systemImage: "eye", title: "Baja visión", subtitle: "Necesito texto más grande")
+                            .init(
+                                key: "adhd",
+                                systemImage: "brain.head.profile",
+                                title: "Tengo TDAH",
+                                subtitle: "Bloques con pausas, modo foco, racha visible, tiempo invertido (sin cuenta atrás), feedback breve. La IA comenta solo el error más importante."
+                            ),
+                            .init(
+                                key: "autism",
+                                systemImage: "figure.mind.and.body",
+                                title: "Estoy en el espectro autista",
+                                subtitle: "Rutina y aviso antes de practicar, menos presión de tiempo, feedback con formato fijo y lenguaje literal. Sin depender solo del color para acierto o error."
+                            ),
+                            .init(
+                                key: "dyslexia",
+                                systemImage: "text.book.closed",
+                                title: "Tengo dislexia",
+                                subtitle: "Preguntas más cortas al generar tarjetas, texto más legible y énfasis en audio. La IA usa frases simples y puede leer el feedback."
+                            ),
+                            .init(
+                                key: "low_vision",
+                                systemImage: "eye",
+                                title: "Baja visión",
+                                subtitle: "Texto y controles más grandes y más contraste cuando la app lo aplica; respeta también el tamaño de letra del sistema."
+                            )
                         ],
                         selection: $accessibilitySelections,
                         topTrailingAction: .init(title: "Saltar") {
@@ -231,6 +251,7 @@ private struct OnboardingWelcomePage: View {
                     Image(systemName: "arrow.right")
                 }
                 .fontWeight(.semibold)
+                .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(AeroPrimaryButtonStyle())
             .controlSize(isLargeCanvas ? .large : .regular)
@@ -309,6 +330,11 @@ private struct OnboardingMultiSelectPage: View {
             }
             .padding(.top, 6)
 
+            Text("Puedes cambiar esto después en Configuración; lo que marques ahora solo prepara la app para las siguientes funciones.")
+                .font(isLargeCanvas ? .callout : .caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
             Spacer(minLength: 8)
 
             Button(action: onPrimary) {
@@ -317,6 +343,7 @@ private struct OnboardingMultiSelectPage: View {
                     Image(systemName: "arrow.right")
                 }
                 .fontWeight(.semibold)
+                .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(AeroPrimaryButtonStyle())
             .controlSize(isLargeCanvas ? .large : .regular)
@@ -358,7 +385,8 @@ private struct SelectCard: View {
                 Text(subtitle)
                     .font(isLargeCanvas ? .body : .caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(isLargeCanvas ? 3 : 2)
+                    .lineLimit(isLargeCanvas ? 5 : 4)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(isLargeCanvas ? 16 : 12)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -371,9 +399,9 @@ private struct SelectCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title)
+        .accessibilityLabel("\(title). \(subtitle)")
         .accessibilityValue(isSelected ? "Seleccionado" : "No seleccionado")
-        .accessibilityHint("Doble toque para cambiar la selección.")
+        .accessibilityHint("Doble toque para cambiar la selección. Double tap to toggle selection.")
     }
 }
 
@@ -408,6 +436,7 @@ private struct OnboardingNamePage: View {
                     Image(systemName: "arrow.right")
                 }
                 .fontWeight(.semibold)
+                .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(AeroPrimaryButtonStyle())
             .controlSize(isLargeCanvas ? .large : .regular)

@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 import Combine
+#if canImport(UIKit)
+import UIKit
+#endif
 
 @MainActor
 final class PracticeSessionViewModel: ObservableObject {
@@ -166,6 +169,10 @@ final class PracticeSessionViewModel: ObservableObject {
                 consecutiveCorrectStreak = 0
             }
             isShowingAnswer = true
+            #if canImport(UIKit)
+            let style: UIImpactFeedbackGenerator.FeedbackStyle = dto.isCorrect ? .light : .medium
+            UIImpactFeedbackGenerator(style: style).impactOccurred()
+            #endif
         } catch {
             evaluationResult = nil
         }
