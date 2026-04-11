@@ -16,6 +16,7 @@ struct SettingsView: View {
     @AppStorage("textSize") private var textSize: String = "normal" // normal | large | extraLarge
     /// system | light | dark
     @AppStorage("colorSchemePreference") private var colorSchemePreference: String = "system"
+    @AppStorage("podcastEnabled") private var podcastEnabled: Bool = false
 
     @State private var nameDraft: String = ""
 
@@ -95,6 +96,15 @@ struct SettingsView: View {
                 Label("Accesibilidad", systemImage: "accessibility")
             } footer: {
                 Text("Estas preferencias ayudan a ajustar contraste, movimiento y tamaño de texto cuando tiene sentido.")
+            }
+
+            Section {
+                Toggle("Modo Podcast", isOn: $podcastEnabled)
+                    .onChange(of: podcastEnabled) { _, _ in syncProfile() }
+            } header: {
+                Label("Audio", systemImage: "headphones")
+            } footer: {
+                Text("Activa el modo podcast para escuchar tus recursos como audio narrado. Ideal si prefieres aprender escuchando.")
             }
 
             Section {

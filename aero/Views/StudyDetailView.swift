@@ -8,8 +8,12 @@ struct StudyDetailView: View {
     @StateObject private var viewModel: StudyDetailViewModel
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @AppStorage("podcastEnabled") private var podcastEnabled: Bool = false
+    @AppStorage("accessibilityNeeds") private var accessibilityNeeds: String = ""
+    @AppStorage("sessionStyle") private var sessionStyle: String = ""
     @State private var selectedTab = 0
     @State private var showingAnkiSession = false
+    @State private var showingPodcast = false
 
     var onNavigateBack: (() -> Void)? = nil
 
@@ -21,6 +25,11 @@ struct StudyDetailView: View {
     private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
     private var contentWidth: CGFloat {
         isLargeCanvas ? AeroAdaptiveLayout.maxRegularContentWidth : AeroAdaptiveLayout.maxCompactContentWidth
+    }
+    private var showPodcastButton: Bool {
+        podcastEnabled
+        || accessibilityNeeds.contains("dyslexia")
+        || sessionStyle.contains("prefer_audio")
     }
 
     var body: some View {
@@ -47,6 +56,7 @@ struct StudyDetailView: View {
             }
         }
         .fullScreenCover(isPresented: $showingAnkiSession) { AnkiSessionView(viewModel: viewModel) }
+        .fullScreenCover(isPresented: $showingPodcast) { StudyPodcastPlayerView(study: viewModel.study) }
         .onAppear {
             viewModel.modelContext = modelContext
             viewModel.fetchContent()
@@ -70,7 +80,8 @@ struct StudyDetailView: View {
                 ankiDueCount: viewModel.ankiReviewQueue.count,
                 isLargeCanvas: true,
                 onNavigateBack: onNavigateBack,
-                onStartAnkiSession: { showingAnkiSession = true }
+                onStartAnkiSession: { showingAnkiSession = true },
+                onStartPodcast: showPodcastButton ? { showingPodcast = true } : nil
             )
             StudyTabPicker(selectedTab: $selectedTab, isLargeCanvas: true)
             Divider()
@@ -113,7 +124,8 @@ struct StudyDetailView: View {
                 ankiDueCount: viewModel.ankiReviewQueue.count,
                 isLargeCanvas: false,
                 onNavigateBack: nil,
-                onStartAnkiSession: { showingAnkiSession = true }
+                onStartAnkiSession: { showingAnkiSession = true },
+                onStartPodcast: showPodcastButton ? { showingPodcast = true } : nil
             )
             StudyTabPicker(selectedTab: $selectedTab, isLargeCanvas: false)
 
@@ -173,6 +185,7 @@ struct StudyHeroHeader: View {
     /// En iPad / Mac: botón para volver a la biblioteca.
     var onNavigateBack: (() -> Void)? = nil
     var onStartAnkiSession: (() -> Void)? = nil
+    var onStartPodcast: (() -> Void)? = nil
 
     @State private var wikipediaThumbnail: URL?
     @State private var wikipediaFetchFinished = false
@@ -362,7 +375,20 @@ struct StudyHeroHeader: View {
                 .accessibilityLabel("Examen simulado")
             }
 
-            if !hasPractice {
+            if resourceCount > 0, let onStartPodcast {
+                Button {
+                    onStartPodcast()
+                } label: {
+                    Image(systemName: "headphones")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Escuchar como podcast")
+            }
+
+            if !hasPractice && resourceCount == 0 {
                 Text("Añade recursos y genera tarjetas para practicar.")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.45))
