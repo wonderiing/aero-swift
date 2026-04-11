@@ -130,16 +130,6 @@ struct SettingsView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityLabel("Cerrar configuración")
-            }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Listo") { dismiss() }
                     .fontWeight(.semibold)
@@ -273,4 +263,3 @@ private func toCSV(_ values: [String]) -> String {
         .sorted()
         .joined(separator: ",")
 }
-

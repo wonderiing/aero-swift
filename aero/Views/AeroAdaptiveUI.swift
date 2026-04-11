@@ -10,47 +10,32 @@ import AppKit
 
 enum AeroAdaptiveLayout {
     static let maxCompactContentWidth: CGFloat = 560
-    /// Ancho máximo del contenido en iPhone landscape / iPad.
     static let maxRegularContentWidth: CGFloat = 920
-    /// Lista de estudios en iPad ancho: permite 3 columnas cómodas.
     static let maxStudyListWidth: CGFloat = 1180
+    static let sidebarWidth: CGFloat = 220
 
-    /// Rejilla de tarjetas: en iPhone 1 columna; en iPad columnas adaptativas (2–3 según ancho).
     static func studyGridItems(horizontalSizeClass: UserInterfaceSizeClass?) -> [GridItem] {
         let large = aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass)
-        if !large {
-            return [GridItem(.flexible(), spacing: 14)]
-        }
+        if !large { return [GridItem(.flexible(), spacing: 14)] }
         return [GridItem(.adaptive(minimum: 296, maximum: 420), spacing: 18, alignment: .top)]
     }
 }
 
-// MARK: - Tipografía adaptativa (Dynamic Type + iPad)
-
 enum AeroType {
-    /// Saludo / título destacado en lista de estudios.
     static func studyGreeting(largeCanvas: Bool) -> Font {
         largeCanvas
             ? .system(.title, design: .rounded).weight(.bold)
             : .system(.title2, design: .rounded).weight(.bold)
     }
-
-    /// Título de cada tarjeta de estudio.
     static func studyCardTitle(largeCanvas: Bool) -> Font {
         largeCanvas
             ? .system(.title3, design: .default).weight(.semibold)
             : .system(.headline, design: .default).weight(.semibold)
     }
-
-    /// Cuerpo secundario en tarjetas (descripción).
     static func studyCardBody(largeCanvas: Bool) -> Font {
         largeCanvas ? .body : .subheadline
     }
-
-    /// Rótulos de sección (mayúsculas) — respeta Dynamic Type.
-    static func sectionOverline() -> Font {
-        .caption.weight(.semibold)
-    }
+    static func sectionOverline() -> Font { .caption.weight(.semibold) }
 }
 
 func aeroIsLargeCanvas(horizontalSizeClass: UserInterfaceSizeClass?) -> Bool {
@@ -78,21 +63,20 @@ extension Color {
         #endif
     }
 
-    // MARK: - Atheneum-style brand (navy + lavanda)
+    // MARK: - Atheneum / Stitch design system
 
-    /// Azul marino principal (botones, títulos de énfasis, pestaña activa).
-    static let aeroNavy = Color(red: 0.10, green: 0.17, blue: 0.38)
+    /// Indigo-navy principal — botones, activos, énfasis.
+    static let aeroNavy = Color(red: 0.18, green: 0.22, blue: 0.56)
 
-    /// Variante más oscura para cabeceras y gradientes suaves.
-    static let aeroNavyDeep = Color(red: 0.05, green: 0.09, blue: 0.20)
+    /// Sidebar background — muy oscuro.
+    static let aeroNavyDeep = Color(red: 0.07, green: 0.09, blue: 0.26)
 
-    /// Acento suave tipo mockup (highlights, chips).
-    static let aeroLavender = Color(red: 0.58, green: 0.54, blue: 0.94)
+    /// Accent claro — highlights, tags, badges.
+    static let aeroLavender = Color(red: 0.48, green: 0.56, blue: 0.95)
 
-    /// Barra de progreso / acierto (verde menta del diseño).
-    static let aeroMint = Color(red: 0.36, green: 0.78, blue: 0.62)
+    /// Verde progreso / acierto.
+    static let aeroMint = Color(red: 0.27, green: 0.76, blue: 0.49)
 
-    /// Relleno de tarjeta en modo claro (blanco puro sobre gris de fondo).
     static var aeroCardFill: Color {
         #if os(macOS)
         return Color(nsColor: .textBackgroundColor)

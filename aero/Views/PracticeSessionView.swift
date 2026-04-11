@@ -375,7 +375,7 @@ struct FlashcardView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.large)
-                    .tint(speech.isRecording ? .red : .indigo)
+                    .tint(speech.isRecording ? .red : Color.aeroNavy)
 
                     if speech.authorizationDenied {
                         Text("Activa micrófono en Ajustes.")
@@ -393,7 +393,7 @@ struct FlashcardView: View {
                             HStack(spacing: 16) {
                                 Image(systemName: selectedMCOption == opt ? "largecircle.fill.circle" : "circle")
                                     .font(.title2)
-                                    .foregroundStyle(selectedMCOption == opt ? Color.indigo : Color.secondary)
+                                    .foregroundStyle(selectedMCOption == opt ? Color.aeroNavy : Color.secondary)
                                 Text(opt)
                                     .font(.title3)
                                     .fontWeight(selectedMCOption == opt ? .medium : .regular)
@@ -402,11 +402,11 @@ struct FlashcardView: View {
                             }
                             .padding(.horizontal, 20)
                             .padding(.vertical, 18)
-                            .background(selectedMCOption == opt ? Color.indigo.opacity(0.10) : Color.aeroSecondaryBackground)
+                            .background(selectedMCOption == opt ? Color.aeroNavy.opacity(0.10) : Color.aeroSecondaryBackground)
                             .clipShape(.rect(cornerRadius: 16))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .strokeBorder(selectedMCOption == opt ? Color.indigo.opacity(0.4) : Color.clear, lineWidth: 2)
+                                    .strokeBorder(selectedMCOption == opt ? Color.aeroNavy.opacity(0.4) : Color.clear, lineWidth: 2)
                             )
                         }
                         .buttonStyle(.plain)
@@ -499,7 +499,7 @@ struct NoCardsView: View {
             VStack(spacing: 20) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 80))
-                    .foregroundStyle(.indigo.opacity(0.35))
+                    .foregroundStyle(Color.aeroNavy.opacity(0.35))
                 Text("¡Estás al día!")
                     .font(.title3)
                     .fontWeight(.bold)

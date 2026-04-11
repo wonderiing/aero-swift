@@ -45,8 +45,8 @@ private struct AeroBackground: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    Color.indigo.opacity(0.18),
-                    Color.purple.opacity(0.10),
+                    Color.cyan.opacity(0.15),
+                    Color.teal.opacity(0.08),
                     .aeroGroupedBackground
                 ],
                 startPoint: .topLeading,
@@ -56,13 +56,13 @@ private struct AeroBackground: View {
 
             // Subtle glow blobs
             Circle()
-                .fill(Color.indigo.opacity(0.10))
+                .fill(Color.cyan.opacity(0.12))
                 .frame(width: 260, height: 260)
                 .blur(radius: 28)
                 .offset(x: -140, y: -220)
 
             Circle()
-                .fill(Color.purple.opacity(0.10))
+                .fill(Color.teal.opacity(0.08))
                 .frame(width: 300, height: 300)
                 .blur(radius: 32)
                 .offset(x: 170, y: -140)
@@ -153,7 +153,7 @@ private struct ResourceSelectionRow: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                 .font(typeScale.sectionHeader)
-                .foregroundStyle(isSelected ? Color.indigo : Color.secondary)
+                .foregroundStyle(isSelected ? Color.aeroNavy : Color.secondary)
                 .symbolRenderingMode(.hierarchical)
                 .contentTransition(.symbolEffect(.replace))
                 .accessibilityHidden(true)
@@ -175,17 +175,17 @@ private struct ResourceSelectionRow: View {
             Toggle("", isOn: $isSelected)
                 .labelsHidden()
                 .toggleStyle(.switch)
-                .tint(.indigo)
+                .tint(Color.aeroNavy)
                 .controlSize(isLargeCanvas ? .large : .regular)
         }
         .padding(.vertical, isLargeCanvas ? 10 : 6)
         .padding(.horizontal, isLargeCanvas ? 14 : 10)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(isSelected ? Color.indigo.opacity(0.08) : Color.clear)
+                .fill(isSelected ? Color.aeroNavy.opacity(0.08) : Color.clear)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(isSelected ? Color.indigo.opacity(0.22) : Color.white.opacity(0.12), lineWidth: 1)
+                        .strokeBorder(isSelected ? Color.aeroNavy.opacity(0.22) : Color.white.opacity(0.12), lineWidth: 1)
                 )
         )
         .scaleEffect(highlight ? 0.985 : 1.0)
@@ -231,7 +231,7 @@ fileprivate struct GenerationProgressOverlay: View {
                 Circle()
                     .fill(
                         RadialGradient(
-                            colors: [.indigo.opacity(0.15), .purple.opacity(0.05), .clear],
+                            colors: [.teal.opacity(0.18), .cyan.opacity(0.06), .clear],
                             center: .center,
                             startRadius: 20,
                             endRadius: 80
@@ -244,7 +244,7 @@ fileprivate struct GenerationProgressOverlay: View {
                     .trim(from: 0, to: progress)
                     .stroke(
                         AngularGradient(
-                            colors: [.indigo, .purple, .indigo],
+                            colors: [.teal, .cyan, .teal],
                             center: .center
                         ),
                         style: StrokeStyle(lineWidth: 5, lineCap: .round)
@@ -255,7 +255,7 @@ fileprivate struct GenerationProgressOverlay: View {
                 Image(systemName: iconName)
                     .font(.system(size: 34))
                     .foregroundStyle(
-                        LinearGradient(colors: [.indigo, .purple],
+                        LinearGradient(colors: [.teal, .cyan],
                                        startPoint: .topLeading, endPoint: .bottomTrailing)
                     )
                     .contentTransition(.symbolEffect(.replace))
@@ -275,7 +275,7 @@ fileprivate struct GenerationProgressOverlay: View {
 
                         Capsule()
                             .fill(
-                                LinearGradient(colors: [.indigo, .purple],
+                                LinearGradient(colors: [.teal, .cyan],
                                                startPoint: .leading, endPoint: .trailing)
                             )
                             .frame(width: max(0, geo.size.width * progress), height: 6)
@@ -359,7 +359,7 @@ struct GenerateFlashcardsSheet: View {
                                     Image(systemName: "apple.intelligence")
                                         .font(typeScale.sectionHeader)
                                         .foregroundStyle(
-                                            LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                            LinearGradient(colors: [.teal, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
                                         )
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("Apple Intelligence activa")
@@ -518,10 +518,10 @@ struct GenerateFlashcardsSheet: View {
                             .padding(.vertical, 14)
                             .background(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(canGenerate ? AnyShapeStyle(LinearGradient(colors: [.indigo, .purple], startPoint: .leading, endPoint: .trailing)) : AnyShapeStyle(Color.gray.opacity(0.25)))
+                                    .fill(canGenerate ? AnyShapeStyle(LinearGradient(colors: [.teal, .cyan], startPoint: .leading, endPoint: .trailing)) : AnyShapeStyle(Color.gray.opacity(0.25)))
                             )
                             .foregroundStyle(canGenerate ? .white : .secondary)
-                            .shadow(color: canGenerate ? .purple.opacity(0.25) : .clear, radius: 16, y: 8)
+                            .shadow(color: canGenerate ? .teal.opacity(0.28) : .clear, radius: 16, y: 8)
                         }
                         .disabled(!canGenerate)
                         .controlSize(isLargeCanvas ? .large : .regular)
@@ -694,7 +694,7 @@ struct ReviewGeneratedFlashcardsView: View {
                                 HStack(spacing: 10) {
                                     Image(systemName: card.type == .open ? "text.bubble" : "list.bullet.circle")
                                         .foregroundStyle(
-                                            LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                            LinearGradient(colors: [.teal, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
                                         )
                                         .symbolRenderingMode(.hierarchical)
                                         .accessibilityHidden(true)
@@ -703,7 +703,7 @@ struct ReviewGeneratedFlashcardsView: View {
                                     Spacer()
                                     Toggle("Incluir", isOn: $card.isIncluded)
                                         .labelsHidden()
-                                        .tint(.indigo)
+                                        .tint(Color.aeroNavy)
                                         .controlSize(isLargeCanvas ? .large : .regular)
                                 }
 
@@ -854,7 +854,7 @@ struct GenerateAnkiCardsSheet: View {
                             HStack(alignment: .top, spacing: 12) {
                                 Image(systemName: "rectangle.on.rectangle.angled")
                                     .font(typeScale.sectionHeader)
-                                    .foregroundStyle(LinearGradient(colors: [.teal, .indigo], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .foregroundStyle(LinearGradient(colors: [.teal, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing))
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("Flashcards estilo Anki")
                                         .font(typeScale.sectionHeader)
@@ -872,7 +872,7 @@ struct GenerateAnkiCardsSheet: View {
                                 HStack(alignment: .center, spacing: 12) {
                                     Image(systemName: "apple.intelligence")
                                         .font(typeScale.sectionHeader)
-                                        .foregroundStyle(LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                        .foregroundStyle(LinearGradient(colors: [.teal, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing))
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("Apple Intelligence activa")
                                             .font(typeScale.sectionHeader)
@@ -1017,7 +1017,7 @@ struct GenerateAnkiCardsSheet: View {
                             .background(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .fill(canGenerate
-                                          ? AnyShapeStyle(LinearGradient(colors: [.teal, .indigo], startPoint: .leading, endPoint: .trailing))
+                                          ? AnyShapeStyle(LinearGradient(colors: [.teal, .cyan], startPoint: .leading, endPoint: .trailing))
                                           : AnyShapeStyle(Color.gray.opacity(0.25)))
                             )
                             .foregroundStyle(canGenerate ? .white : .secondary)
@@ -1156,7 +1156,7 @@ struct ReviewGeneratedAnkiView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack(spacing: 10) {
                                     Image(systemName: "rectangle.on.rectangle.angled")
-                                        .foregroundStyle(LinearGradient(colors: [.teal, .indigo], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                        .foregroundStyle(LinearGradient(colors: [.teal, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing))
                                         .symbolRenderingMode(.hierarchical).accessibilityHidden(true)
                                     Text("Flashcard Anki").font(typeScale.sectionHeader)
                                     Spacer()

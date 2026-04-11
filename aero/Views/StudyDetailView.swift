@@ -11,7 +11,10 @@ struct StudyDetailView: View {
     @State private var selectedTab = 0
     @State private var showingAnkiSession = false
 
-    init(study: SDStudy) {
+    var onNavigateBack: (() -> Void)? = nil
+
+    init(study: SDStudy, onNavigateBack: (() -> Void)? = nil) {
+        self.onNavigateBack = onNavigateBack
         _viewModel = StateObject(wrappedValue: StudyDetailViewModel(study: study))
     }
 
@@ -21,29 +24,102 @@ struct StudyDetailView: View {
     }
 
     var body: some View {
+        Group {
+            if isLargeCanvas {
+                largeCanvasLayout
+            } else {
+                compactLayout
+            }
+        }
+        .tint(Color.aeroNavy)
+        .sheet(isPresented: $viewModel.showingAddResource) { AddResourceView(viewModel: viewModel) }
+        .sheet(isPresented: $viewModel.showingGenerateFlashcards) { GenerateFlashcardsSheet(viewModel: viewModel) }
+        .sheet(isPresented: $viewModel.showingGenerateAnkiCards) { GenerateAnkiCardsSheet(viewModel: viewModel) }
+        .sheet(isPresented: $viewModel.showingCreateFlashcardManual) { CreateFlashcardManualView(viewModel: viewModel) }
+        .sheet(isPresented: $viewModel.showingGenerateFromGaps) { GenerateFromGapsSheet(viewModel: viewModel) }
+        .fullScreenCover(isPresented: $showingAnkiSession) { AnkiSessionView(viewModel: viewModel) }
+        .onAppear {
+            viewModel.modelContext = modelContext
+            viewModel.fetchContent()
+        }
+    }
+
+    // MARK: Large canvas — tab picker in content area (single sidebar from parent)
+
+    @ViewBuilder
+    private var largeCanvasLayout: some View {
+        VStack(spacing: 0) {
+            // Study title bar with optional back action
+            HStack(spacing: 0) {
+                if let onNavigateBack {
+                    Button(action: onNavigateBack) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "chevron.left").font(.caption.weight(.semibold))
+                            Text("Biblioteca").font(.subheadline)
+                        }
+                        .foregroundStyle(Color.aeroNavy)
+                        .padding(.horizontal, 16)
+                    }
+                    .buttonStyle(.plain)
+                    Divider().frame(height: 20)
+                }
+                StudyTabPicker(selectedTab: $selectedTab, isLargeCanvas: true)
+            }
+            .background(Color(uiColor: .systemBackground))
+
+            Divider()
+
+            // Content
+            ZStack {
+                Color(uiColor: .systemBackground).ignoresSafeArea()
+
+                if viewModel.isLoading && viewModel.resources.isEmpty && viewModel.flashcards.isEmpty && viewModel.ankiCards.isEmpty {
+                    ProgressView().frame(maxHeight: .infinity)
+                } else {
+                    TabView(selection: $selectedTab) {
+                        ResourcesTab(viewModel: viewModel, isLargeCanvas: true).tag(0)
+                        AnkiCardsTab(viewModel: viewModel, isLargeCanvas: true).tag(1)
+                        ExamenSimuladoTab(viewModel: viewModel, isLargeCanvas: true).tag(2)
+                        ProgressTab(viewModel: viewModel, isLargeCanvas: true).tag(3)
+                        StudyCanvasTab(viewModel: viewModel, isLargeCanvas: true).tag(4)
+                    }
+                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                    .animation(.easeInOut(duration: 0.22), value: selectedTab)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        // Keep toolbar visible so macOS shows the system sidebar toggle in the window bar
+        .navigationTitle("")
+        .toolbarBackground(.hidden, for: .navigationBar)
+    }
+
+    // MARK: Compact — original tab picker layout
+
+    @ViewBuilder
+    private var compactLayout: some View {
         VStack(spacing: 0) {
             StudyHeroHeader(
                 study: viewModel.study,
                 reviewCount: viewModel.reviewQueue.count,
                 ankiCardCount: viewModel.ankiCards.count,
                 ankiDueCount: viewModel.ankiReviewQueue.count,
-                isLargeCanvas: isLargeCanvas,
+                isLargeCanvas: false,
                 onStartAnkiSession: { showingAnkiSession = true }
             )
-            StudyTabPicker(selectedTab: $selectedTab, isLargeCanvas: isLargeCanvas)
+            StudyTabPicker(selectedTab: $selectedTab, isLargeCanvas: false)
 
             ZStack {
                 AeroAppBackground()
-
                 if viewModel.isLoading && viewModel.resources.isEmpty && viewModel.flashcards.isEmpty && viewModel.ankiCards.isEmpty {
                     ProgressView().frame(maxHeight: .infinity)
                 } else {
                     TabView(selection: $selectedTab) {
-                        ResourcesTab(viewModel: viewModel, isLargeCanvas: isLargeCanvas).tag(0)
-                        AnkiCardsTab(viewModel: viewModel, isLargeCanvas: isLargeCanvas).tag(1)
-                        ExamenSimuladoTab(viewModel: viewModel, isLargeCanvas: isLargeCanvas).tag(2)
-                        ProgressTab(viewModel: viewModel, isLargeCanvas: isLargeCanvas).tag(3)
-                        StudyCanvasTab(viewModel: viewModel, isLargeCanvas: isLargeCanvas).tag(4)
+                        ResourcesTab(viewModel: viewModel, isLargeCanvas: false).tag(0)
+                        AnkiCardsTab(viewModel: viewModel, isLargeCanvas: false).tag(1)
+                        ExamenSimuladoTab(viewModel: viewModel, isLargeCanvas: false).tag(2)
+                        ProgressTab(viewModel: viewModel, isLargeCanvas: false).tag(3)
+                        StudyCanvasTab(viewModel: viewModel, isLargeCanvas: false).tag(4)
                     }
                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                     .frame(maxWidth: contentWidth)
@@ -53,66 +129,26 @@ struct StudyDetailView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .tint(Color.aeroNavy)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if selectedTab == 0 {
-                    Button {
-                        viewModel.showingAddResource = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                    }
+                    Button { viewModel.showingAddResource = true } label: { Image(systemName: "plus.circle.fill") }
                 } else if selectedTab == 1 {
-                    Button {
-                        viewModel.showingGenerateAnkiCards = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                    }
-                    .disabled(viewModel.resources.isEmpty)
+                    Button { viewModel.showingGenerateAnkiCards = true } label: { Image(systemName: "plus.circle.fill") }
+                        .disabled(viewModel.resources.isEmpty)
                 } else if selectedTab == 2 {
                     Menu {
-                        Button {
-                            viewModel.showingGenerateFlashcards = true
-                        } label: {
-                            Label("Generar con IA", systemImage: "wand.and.stars")
-                        }
+                        Button { viewModel.showingGenerateFlashcards = true }
+                        label: { Label("Generar con IA", systemImage: "wand.and.stars") }
                         .disabled(viewModel.resources.isEmpty)
-
-                        Button {
-                            viewModel.showingCreateFlashcardManual = true
-                        } label: {
-                            Label("Crear manualmente", systemImage: "pencil.and.list.clipboard")
-                        }
+                        Button { viewModel.showingCreateFlashcardManual = true }
+                        label: { Label("Crear manualmente", systemImage: "pencil.and.list.clipboard") }
                         .disabled(viewModel.resources.isEmpty)
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                    }
+                    } label: { Image(systemName: "plus.circle.fill") }
                 } else {
                     EmptyView()
                 }
             }
-        }
-        .sheet(isPresented: $viewModel.showingAddResource) {
-            AddResourceView(viewModel: viewModel)
-        }
-        .sheet(isPresented: $viewModel.showingGenerateFlashcards) {
-            GenerateFlashcardsSheet(viewModel: viewModel)
-        }
-        .sheet(isPresented: $viewModel.showingGenerateAnkiCards) {
-            GenerateAnkiCardsSheet(viewModel: viewModel)
-        }
-        .sheet(isPresented: $viewModel.showingCreateFlashcardManual) {
-            CreateFlashcardManualView(viewModel: viewModel)
-        }
-        .sheet(isPresented: $viewModel.showingGenerateFromGaps) {
-            GenerateFromGapsSheet(viewModel: viewModel)
-        }
-        .fullScreenCover(isPresented: $showingAnkiSession) {
-            AnkiSessionView(viewModel: viewModel)
-        }
-        .onAppear {
-            viewModel.modelContext = modelContext
-            viewModel.fetchContent()
         }
     }
 }
@@ -828,7 +864,7 @@ struct ProgressTab: View {
                         if hasExamData {
                             ProgressSectionHeader(title: "Examen simulado",
                                                   systemImage: "doc.questionmark.fill",
-                                                  color: .indigo)
+                                                  color: Color.aeroNavy)
 
                             AeroSurfaceCard {
                                 HStack(spacing: 20) {
@@ -839,7 +875,7 @@ struct ProgressTab: View {
                                         Circle()
                                             .trim(from: 0, to: CGFloat(acc))
                                             .stroke(
-                                                LinearGradient(colors: [.indigo, .teal],
+                                                LinearGradient(colors: [.teal, .cyan],
                                                                startPoint: .leading, endPoint: .trailing),
                                                 style: StrokeStyle(lineWidth: 10, lineCap: .round)
                                             )
@@ -1006,8 +1042,8 @@ struct ProgressTab: View {
         switch type {
         case .conceptual: return .red
         case .memoria: return .orange
-        case .confusion: return .purple
-        case .incompleto: return .indigo
+        case .confusion: return Color.aeroNavy
+        case .incompleto: return Color.aeroNavy
         }
     }
 }
@@ -1052,7 +1088,7 @@ struct AnkiProgressSummaryCard: View {
                     Circle()
                         .trim(from: 0, to: CGFloat(accuracy))
                         .stroke(
-                            LinearGradient(colors: [.teal, .indigo], startPoint: .leading, endPoint: .trailing),
+                            LinearGradient(colors: [.teal, .cyan], startPoint: .leading, endPoint: .trailing),
                             style: StrokeStyle(lineWidth: 10, lineCap: .round)
                         )
                         .frame(width: 90, height: 90)
@@ -1683,7 +1719,7 @@ struct CreateFlashcardManualView: View {
                     } else if viewModel.resources.count == 1 {
                         HStack {
                             Image(systemName: "doc.text")
-                                .foregroundColor(.indigo)
+                                .foregroundColor(Color.aeroNavy)
                             Text(viewModel.resources[0].title)
                         }
                     } else {

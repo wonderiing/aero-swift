@@ -20,7 +20,6 @@ struct AnkiSessionView: View {
         self.viewModel = viewModel
         let due = viewModel.ankiReviewQueue
         if due.isEmpty {
-            // No hay tarjetas pendientes por SM-2: sesión libre con todas las tarjetas
             _queue = State(initialValue: viewModel.ankiCards.shuffled())
             _isFreeSession = State(initialValue: true)
         } else {
@@ -32,8 +31,12 @@ struct AnkiSessionView: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                // Frutiger Aero: deep ocean teal instead of purple
                 LinearGradient(
-                    colors: [Color(red: 0.12, green: 0.08, blue: 0.38), Color(red: 0.22, green: 0.08, blue: 0.42)],
+                    colors: [
+                        Color(red: 0.04, green: 0.26, blue: 0.44),
+                        Color(red: 0.06, green: 0.38, blue: 0.56)
+                    ],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 )
                 .ignoresSafeArea()
@@ -42,13 +45,13 @@ struct AnkiSessionView: View {
                     AnkiFinishedView(stats: sessionStats, onDismiss: { dismiss() })
                 } else {
                     VStack(spacing: 0) {
-                    AnkiProgressHeader(
-                        current: currentIndex + 1,
-                        total: queue.count,
-                        stats: sessionStats,
-                        isFreeSession: isFreeSession,
-                        isLargeCanvas: isLargeCanvas
-                    )
+                        AnkiProgressHeader(
+                            current: currentIndex + 1,
+                            total: queue.count,
+                            stats: sessionStats,
+                            isFreeSession: isFreeSession,
+                            isLargeCanvas: isLargeCanvas
+                        )
                         .padding(.horizontal, isLargeCanvas ? 32 : 20)
                         .padding(.top, 12)
                         .padding(.bottom, 20)
@@ -134,15 +137,28 @@ private struct AnkiFlipCard: View {
 
     var body: some View {
         ZStack {
-            // Front face
-            AnkiCardFace(text: card.front, label: "PREGUNTA", color: .white, textColor: Color(red: 0.12, green: 0.08, blue: 0.38), isLargeCanvas: isLargeCanvas)
-                .opacity(isFlipped ? 0 : 1)
-                .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
+            // Front — white card, teal text
+            AnkiCardFace(
+                text: card.front,
+                label: "PREGUNTA",
+                color: .white,
+                textColor: Color(red: 0.04, green: 0.34, blue: 0.56),
+                isLargeCanvas: isLargeCanvas
+            )
+            .opacity(isFlipped ? 0 : 1)
+            .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
 
-            // Back face
-            AnkiCardFace(text: card.back, label: "RESPUESTA", color: Color(red: 0.28, green: 0.22, blue: 0.92), textColor: .white, tags: card.tags, isLargeCanvas: isLargeCanvas)
-                .opacity(isFlipped ? 1 : 0)
-                .rotation3DEffect(.degrees(isFlipped ? 0 : -180), axis: (x: 0, y: 1, z: 0))
+            // Back — teal card, white text
+            AnkiCardFace(
+                text: card.back,
+                label: "RESPUESTA",
+                color: Color(red: 0.06, green: 0.50, blue: 0.70),
+                textColor: .white,
+                tags: card.tags,
+                isLargeCanvas: isLargeCanvas
+            )
+            .opacity(isFlipped ? 1 : 0)
+            .rotation3DEffect(.degrees(isFlipped ? 0 : -180), axis: (x: 0, y: 1, z: 0))
         }
         .frame(maxWidth: isLargeCanvas ? 600 : .infinity)
         .frame(height: isLargeCanvas ? 300 : 240)
@@ -201,7 +217,15 @@ private struct AnkiCardFace: View {
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(color)
-                .shadow(color: .black.opacity(0.25), radius: 24, y: 12)
+                // Glossy sheen
+                .overlay(
+                    LinearGradient(
+                        colors: [.white.opacity(0.30), .clear],
+                        startPoint: .top, endPoint: .center
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                )
+                .shadow(color: .black.opacity(0.22), radius: 24, y: 12)
         )
     }
 }
@@ -213,10 +237,10 @@ private struct AnkiRatingButtons: View {
     let onRate: (Int) -> Void
 
     private let ratings: [(label: String, icon: String, quality: Int, color: Color)] = [
-        ("De nuevo", "xmark.circle.fill", 1, .red),
-        ("Difícil", "minus.circle.fill", 3, .orange),
-        ("Bien", "checkmark.circle.fill", 4, .green),
-        ("Perfecto", "star.circle.fill", 5, Color(red: 0.4, green: 0.2, blue: 0.9))
+        ("De nuevo", "xmark.circle.fill",    1, .red),
+        ("Difícil",  "minus.circle.fill",    3, .orange),
+        ("Bien",     "checkmark.circle.fill", 4, .green),
+        ("Perfecto", "star.circle.fill",      5, Color(red: 0.08, green: 0.72, blue: 0.80))
     ]
 
     var body: some View {
@@ -296,7 +320,7 @@ private struct AnkiProgressHeader: View {
                     Capsule().fill(.white.opacity(0.15)).frame(height: 5)
                     Capsule()
                         .fill(LinearGradient(
-                            colors: isFreeSession ? [.teal, .indigo] : [.indigo, .purple],
+                            colors: isFreeSession ? [.teal, .cyan] : [.cyan, Color.aeroLavender],
                             startPoint: .leading, endPoint: .trailing)
                         )
                         .frame(width: max(0, geo.size.width * CGFloat(progress)), height: 5)
@@ -317,11 +341,17 @@ private struct AnkiFinishedView: View {
         VStack(spacing: 28) {
             ZStack {
                 Circle()
-                    .fill(LinearGradient(colors: [.indigo.opacity(0.3), .purple.opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .fill(LinearGradient(
+                        colors: [.teal.opacity(0.30), .cyan.opacity(0.18)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ))
                     .frame(width: 120, height: 120)
                 Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 52))
-                    .foregroundStyle(LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .foregroundStyle(LinearGradient(
+                        colors: [.teal, .cyan],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ))
             }
 
             VStack(spacing: 8) {
@@ -337,14 +367,14 @@ private struct AnkiFinishedView: View {
 
             HStack(spacing: 24) {
                 StatBadge(value: stats.easy + stats.perfect, label: "Correctas", color: .green)
-                StatBadge(value: stats.hard, label: "Difíciles", color: .orange)
-                StatBadge(value: stats.again, label: "De nuevo", color: .red)
+                StatBadge(value: stats.hard,                 label: "Difíciles", color: .orange)
+                StatBadge(value: stats.again,                label: "De nuevo",  color: .red)
             }
 
             Button(action: onDismiss) {
                 Text("Volver")
                     .fontWeight(.semibold)
-                    .foregroundStyle(Color(red: 0.12, green: 0.08, blue: 0.38))
+                    .foregroundStyle(Color.aeroNavyDeep)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))

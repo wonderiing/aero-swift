@@ -27,8 +27,15 @@ final class SpeechInputController: NSObject, ObservableObject {
             return false
         }
         let micOK = await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
-            AVAudioSession.sharedInstance().requestRecordPermission { granted in
-                c.resume(returning: granted)
+            if #available(iOS 17.0, macCatalyst 17.0, *) {
+                Task {
+                    let granted = await AVAudioApplication.requestRecordPermission()
+                    c.resume(returning: granted)
+                }
+            } else {
+                AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                    c.resume(returning: granted)
+                }
             }
         }
         if !micOK { authorizationDenied = true }

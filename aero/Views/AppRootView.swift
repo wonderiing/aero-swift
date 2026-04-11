@@ -90,4 +90,3 @@ private struct ReduceMotionOverride: ViewModifier {
         }
     }
 }
-

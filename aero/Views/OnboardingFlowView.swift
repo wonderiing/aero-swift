@@ -415,4 +415,3 @@ private struct OnboardingNamePage: View {
         .padding(isLargeCanvas ? 24 : 16)
     }
 }
-

@@ -1,6 +1,6 @@
 import Foundation
 import PDFKit
-import Vision
+@preconcurrency import Vision
 import UIKit
 
 enum DocumentTextExtractorError: Error {
@@ -36,34 +36,28 @@ enum DocumentTextExtractor {
 
     private static func recognizeText(in image: UIImage) async throws -> String {
         guard let cg = image.cgImage else { throw DocumentTextExtractorError.noTextFound }
-        return try await withCheckedThrowingContinuation { cont in
-            let request = VNRecognizeTextRequest { req, err in
-                if let err {
-                    cont.resume(throwing: err)
-                    return
-                }
-                let lines = (req.results as? [VNRecognizedTextObservation])?
-                    .compactMap { $0.topCandidates(1).first?.string } ?? []
-                let text = lines.joined(separator: "\n")
-                if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    cont.resume(throwing: DocumentTextExtractorError.noTextFound)
-                } else {
-                    cont.resume(returning: text)
-                }
-            }
+
+        // Task.detached keeps all Vision types within the same concurrency context,
+        // eliminating Sendable capture warnings entirely.
+        return try await Task.detached(priority: .userInitiated) {
+            let request = VNRecognizeTextRequest()
             request.recognitionLevel = .accurate
             request.usesLanguageCorrection = true
             if #available(iOS 16.0, *) {
                 request.revision = VNRecognizeTextRequestRevision3
             }
+
             let handler = VNImageRequestHandler(cgImage: cg, options: [:])
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    try handler.perform([request])
-                } catch {
-                    cont.resume(throwing: error)
-                }
+            try handler.perform([request])
+
+            let lines = (request.results ?? [])
+                .compactMap { $0.topCandidates(1).first?.string }
+            let text = lines.joined(separator: "\n")
+
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw DocumentTextExtractorError.noTextFound
             }
-        }
+            return text
+        }.value
     }
 }

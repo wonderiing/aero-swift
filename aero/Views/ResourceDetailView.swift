@@ -93,11 +93,19 @@ struct ResourceDetailView: View {
         }
         .navigationTitle("Recurso")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)           // override parent's .hidden
+        .toolbarColorScheme(.light, for: .navigationBar)  // always light, regardless of header
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancelar") { dismiss() }
+                    .foregroundStyle(.secondary)
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Guardar") {
+                Button {
                     studyViewModel.updateResource(id: resource.id, title: title, content: content)
                     dismiss()
+                } label: {
+                    Text("Guardar").fontWeight(.semibold)
                 }
                 .disabled(title.count < 3 || content.isEmpty)
             }
