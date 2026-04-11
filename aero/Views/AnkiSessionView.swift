@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - Anki Session View
 
@@ -6,6 +7,7 @@ struct AnkiSessionView: View {
     @ObservedObject var viewModel: StudyDetailViewModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.modelContext) private var modelContext
 
     @State private var queue: [SDAnkiCard]
     @State private var isFreeSession: Bool
@@ -13,6 +15,8 @@ struct AnkiSessionView: View {
     @State private var isFlipped = false
     @State private var isFinished = false
     @State private var sessionStats = SessionStats()
+    // Batch SM-2 updates to avoid fullScreenCover flickering from fetchContent() calls
+    @State private var pendingUpdates: [(card: SDAnkiCard, quality: Int)] = []
 
     private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
 
@@ -114,7 +118,8 @@ struct AnkiSessionView: View {
 
     private func rateCard(quality: Int) {
         let card = queue[currentIndex]
-        viewModel.updateAnkiSM2(card: card, quality: quality)
+        // Accumulate — don't call updateAnkiSM2 yet to avoid re-render flicker
+        pendingUpdates.append((card: card, quality: quality))
         sessionStats.record(quality: quality)
 
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
@@ -122,9 +127,28 @@ struct AnkiSessionView: View {
                 currentIndex += 1
                 isFlipped = false
             } else {
+                // Show finished screen first, then flush SM-2 updates
+                // (avoids brief card flash caused by fetchContent re-render)
                 isFinished = true
             }
         }
+        if currentIndex + 1 >= queue.count {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(350))
+                flushPendingUpdates()
+            }
+        }
+    }
+
+    private func flushPendingUpdates() {
+        // Save directly to SwiftData — bypasses viewModel @Published updates
+        // so the fullScreenCover never re-renders/flickers during the session.
+        // viewModel.fetchContent() is called by StudyDetailView.onChange after dismiss.
+        for update in pendingUpdates {
+            update.card.updateSM2(quality: update.quality)
+        }
+        try? modelContext.save()
+        pendingUpdates.removeAll()
     }
 }
 

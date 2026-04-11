@@ -42,6 +42,10 @@ struct StudyDetailView: View {
             viewModel.modelContext = modelContext
             viewModel.fetchContent()
         }
+        .onChange(of: showingAnkiSession) { _, isShowing in
+            // Refresh content after session ends (SM-2 was saved directly to context)
+            if !isShowing { viewModel.fetchContent() }
+        }
     }
 
     // MARK: Large canvas — tab picker in content area (single sidebar from parent)
@@ -740,7 +744,36 @@ struct ExamenSimuladoTab: View {
                     }
                 }
                 .padding(.horizontal, isLargeCanvas ? 24 : 16)
-                .padding(.vertical, 12)
+                .padding(.top, 12)
+                .padding(.bottom, 90)
+            }
+            .safeAreaInset(edge: .bottom) {
+                NavigationLink(destination: PracticeSessionView(study: viewModel.study)) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "play.fill")
+                        Text("Practicar examen · \(viewModel.reviewQueue.count) pregunta\(viewModel.reviewQueue.count == 1 ? "" : "s")")
+                            .fontWeight(.semibold)
+                        Spacer()
+                        Text("IA evalúa")
+                            .font(.caption2)
+                            .padding(.horizontal, 6).padding(.vertical, 3)
+                            .background(.white.opacity(0.2), in: Capsule())
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18).padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(LinearGradient(
+                                colors: [Color.aeroNavy, Color.aeroNavyDeep],
+                                startPoint: .leading, endPoint: .trailing
+                            ))
+                            .shadow(color: Color.aeroNavy.opacity(0.35), radius: 14, y: 6)
+                    )
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, isLargeCanvas ? 24 : 16)
+                .padding(.top, 10).padding(.bottom, 16)
+                .background(.ultraThinMaterial)
             }
         }
     }

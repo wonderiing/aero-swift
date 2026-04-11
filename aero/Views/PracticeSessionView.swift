@@ -259,10 +259,14 @@ struct FlashcardView: View {
                         .font(.title3)
                         .fontWeight(.bold)
                 } else {
-                    Label("Incorrecto", systemImage: "xmark.circle.fill")
-                        .foregroundStyle(.red)
-                        .font(.title3)
-                        .fontWeight(.bold)
+                    HStack(spacing: 10) {
+                        Image(systemName: "xmark.circle.fill").font(.title3)
+                        Text("Incorrecto — revisa la respuesta").font(.title3).fontWeight(.bold)
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16).padding(.vertical, 13)
+                    .background(Color.red, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
 
                 // Show model answer for open cards only when wrong
@@ -375,7 +379,7 @@ struct FlashcardView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.large)
-                    .tint(speech.isRecording ? .red : Color.aeroNavy)
+                    .tint(speech.isRecording ? .red : .indigo)
 
                     if speech.authorizationDenied {
                         Text("Activa micrófono en Ajustes.")
@@ -393,7 +397,7 @@ struct FlashcardView: View {
                             HStack(spacing: 16) {
                                 Image(systemName: selectedMCOption == opt ? "largecircle.fill.circle" : "circle")
                                     .font(.title2)
-                                    .foregroundStyle(selectedMCOption == opt ? Color.aeroNavy : Color.secondary)
+                                    .foregroundStyle(selectedMCOption == opt ? Color.indigo : Color.secondary)
                                 Text(opt)
                                     .font(.title3)
                                     .fontWeight(selectedMCOption == opt ? .medium : .regular)
@@ -402,11 +406,11 @@ struct FlashcardView: View {
                             }
                             .padding(.horizontal, 20)
                             .padding(.vertical, 18)
-                            .background(selectedMCOption == opt ? Color.aeroNavy.opacity(0.10) : Color.aeroSecondaryBackground)
+                            .background(selectedMCOption == opt ? Color.indigo.opacity(0.10) : Color.aeroSecondaryBackground)
                             .clipShape(.rect(cornerRadius: 16))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .strokeBorder(selectedMCOption == opt ? Color.aeroNavy.opacity(0.4) : Color.clear, lineWidth: 2)
+                                    .strokeBorder(selectedMCOption == opt ? Color.indigo.opacity(0.4) : Color.clear, lineWidth: 2)
                             )
                         }
                         .buttonStyle(.plain)
@@ -499,7 +503,7 @@ struct NoCardsView: View {
             VStack(spacing: 20) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 80))
-                    .foregroundStyle(Color.aeroNavy.opacity(0.35))
+                    .foregroundStyle(.indigo.opacity(0.35))
                 Text("¡Estás al día!")
                     .font(.title3)
                     .fontWeight(.bold)

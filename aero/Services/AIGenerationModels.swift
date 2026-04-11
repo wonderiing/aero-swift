@@ -12,14 +12,14 @@ enum GeneratedCardKind: String, CaseIterable {
 
 @Generable(description: "Lote de flashcards pedagógicas basadas en el material de estudio")
 struct GeneratedFlashcardPack {
-    @Guide(description: "Lista de flashcards generadas", .minimumCount(2), .maximumCount(28))
+    @Guide(description: "Lista de flashcards generadas", .minimumCount(8), .maximumCount(30))
     var cards: [GeneratedFlashcardItem]
 }
 
 /// Lote pequeño para generación chunked (material largo dividido en partes).
 @Generable(description: "Lote pequeño de flashcards de un fragmento de material")
 struct GeneratedFlashcardChunk {
-    @Guide(description: "Flashcards generadas de este fragmento", .minimumCount(1), .maximumCount(6))
+    @Guide(description: "Flashcards generadas de este fragmento", .minimumCount(3), .maximumCount(8))
     var cards: [GeneratedFlashcardItem]
 }
 
@@ -81,13 +81,13 @@ struct GeneratedAnswerEvaluation {
 
 @Generable(description: "Lote de tarjetas Anki estilo memoria (frente/dorso) basadas en el material de estudio")
 struct GeneratedAnkiPack {
-    @Guide(description: "Lista de tarjetas Anki generadas", .minimumCount(2), .maximumCount(30))
+    @Guide(description: "Lista de tarjetas Anki generadas", .minimumCount(8), .maximumCount(32))
     var cards: [GeneratedAnkiItem]
 }
 
 @Generable(description: "Lote pequeño de tarjetas Anki de un fragmento de material")
 struct GeneratedAnkiChunk {
-    @Guide(description: "Tarjetas Anki de este fragmento", .minimumCount(1), .maximumCount(8))
+    @Guide(description: "Tarjetas Anki de este fragmento", .minimumCount(3), .maximumCount(10))
     var cards: [GeneratedAnkiItem]
 }
 

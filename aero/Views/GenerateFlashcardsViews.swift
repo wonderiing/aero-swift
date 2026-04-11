@@ -42,31 +42,7 @@ fileprivate struct AeroTypeScale {
 
 private struct AeroBackground: View {
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color.cyan.opacity(0.15),
-                    Color.teal.opacity(0.08),
-                    .aeroGroupedBackground
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            // Subtle glow blobs
-            Circle()
-                .fill(Color.cyan.opacity(0.12))
-                .frame(width: 260, height: 260)
-                .blur(radius: 28)
-                .offset(x: -140, y: -220)
-
-            Circle()
-                .fill(Color.teal.opacity(0.08))
-                .frame(width: 300, height: 300)
-                .blur(radius: 32)
-                .offset(x: 170, y: -140)
-        }
+        Color.aeroGroupedBackground.ignoresSafeArea()
     }
 }
 
@@ -231,7 +207,7 @@ fileprivate struct GenerationProgressOverlay: View {
                 Circle()
                     .fill(
                         RadialGradient(
-                            colors: [.teal.opacity(0.18), .cyan.opacity(0.06), .clear],
+                            colors: [Color.aeroNavy.opacity(0.15), Color.aeroLavender.opacity(0.05), .clear],
                             center: .center,
                             startRadius: 20,
                             endRadius: 80
@@ -244,7 +220,7 @@ fileprivate struct GenerationProgressOverlay: View {
                     .trim(from: 0, to: progress)
                     .stroke(
                         AngularGradient(
-                            colors: [.teal, .cyan, .teal],
+                            colors: [Color.aeroNavy, Color.aeroLavender, Color.aeroNavy],
                             center: .center
                         ),
                         style: StrokeStyle(lineWidth: 5, lineCap: .round)
@@ -255,8 +231,7 @@ fileprivate struct GenerationProgressOverlay: View {
                 Image(systemName: iconName)
                     .font(.system(size: 34))
                     .foregroundStyle(
-                        LinearGradient(colors: [.teal, .cyan],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing)
+                        Color.aeroNavy
                     )
                     .contentTransition(.symbolEffect(.replace))
             }
@@ -275,8 +250,7 @@ fileprivate struct GenerationProgressOverlay: View {
 
                         Capsule()
                             .fill(
-                                LinearGradient(colors: [.teal, .cyan],
-                                               startPoint: .leading, endPoint: .trailing)
+                                Color.aeroNavy
                             )
                             .frame(width: max(0, geo.size.width * progress), height: 6)
                     }
@@ -306,6 +280,14 @@ fileprivate struct GenerationProgressOverlay: View {
 
 // MARK: - Generate Flashcards Sheet
 
+// Card type filter for exam generation
+private enum ExamCardType: String, CaseIterable, Identifiable {
+    case mixed = "Mixto"
+    case open = "Abiertas"
+    case multipleChoice = "Opción múltiple"
+    var id: String { rawValue }
+}
+
 struct GenerateFlashcardsSheet: View {
     @ObservedObject var viewModel: StudyDetailViewModel
     @Environment(\.dismiss) private var dismiss
@@ -313,6 +295,7 @@ struct GenerateFlashcardsSheet: View {
 
     @State private var selectedIds: Set<UUID> = []
     @State private var depth: IntelligentStudyAssistant.Depth = .medium
+    @State private var cardTypeFilter: ExamCardType = .mixed
     @State private var drafts: [EditableFlashcard] = []
     @State private var navigateReview = false
     @State private var isGenerating = false
@@ -359,7 +342,7 @@ struct GenerateFlashcardsSheet: View {
                                     Image(systemName: "apple.intelligence")
                                         .font(typeScale.sectionHeader)
                                         .foregroundStyle(
-                                            LinearGradient(colors: [.teal, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                            Color.aeroNavy
                                         )
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("Apple Intelligence activa")
@@ -410,12 +393,10 @@ struct GenerateFlashcardsSheet: View {
                                     .font(typeScale.sectionHeader)
                                     .foregroundStyle(.secondary)
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text("Cantidad orientativa")
-                                        .font(typeScale.sectionHeader)
                                     Picker("Cantidad", selection: $depth) {
-                                        Text("Pocas").tag(IntelligentStudyAssistant.Depth.low)
-                                        Text("Media").tag(IntelligentStudyAssistant.Depth.medium)
-                                        Text("Muchas").tag(IntelligentStudyAssistant.Depth.high)
+                                        Text("8").tag(IntelligentStudyAssistant.Depth.low)
+                                        Text("16").tag(IntelligentStudyAssistant.Depth.medium)
+                                        Text("24").tag(IntelligentStudyAssistant.Depth.high)
                                     }
                                     .pickerStyle(.segmented)
                                     .controlSize(isLargeCanvas ? .large : .regular)
@@ -426,10 +407,34 @@ struct GenerateFlashcardsSheet: View {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                     } header: {
-                        SectionHeader("Ajustes", systemImage: "gearshape", typeScale: typeScale) { EmptyView() }
+                        SectionHeader("Cantidad de preguntas", systemImage: "number.circle", typeScale: typeScale) { EmptyView() }
                     } footer: {
-                        Text(depth == .low ? "Ideal para un repaso rápido." : (depth == .medium ? "Equilibrado para estudiar." : "Más cobertura, tarda un poco más."))
+                        Text(depth == .low ? "Mínimo 8 preguntas." : (depth == .medium ? "Mínimo 16 preguntas." : "Mínimo 24 preguntas."))
                             .font(typeScale.secondary)
+                    }
+
+                    Section {
+                        AeroCard(isLargeCanvas: isLargeCanvas) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Picker("Tipo de preguntas", selection: $cardTypeFilter) {
+                                    ForEach(ExamCardType.allCases) { t in
+                                        Text(t.rawValue).tag(t)
+                                    }
+                                }
+                                .pickerStyle(.segmented)
+                                .controlSize(isLargeCanvas ? .large : .regular)
+                                Text(cardTypeFilter == .mixed
+                                     ? "Mezcla de preguntas abiertas y opción múltiple."
+                                     : cardTypeFilter == .open
+                                       ? "Solo preguntas abiertas, evaluadas por IA."
+                                       : "Solo opción múltiple con 4 opciones para elegir.")
+                                    .font(typeScale.secondary).foregroundStyle(.secondary)
+                            }
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                        .listRowBackground(Color.clear).listRowSeparator(.hidden)
+                    } header: {
+                        SectionHeader("Tipo de preguntas", systemImage: "square.grid.2x2.fill", typeScale: typeScale) { EmptyView() }
                     }
 
                     Section {
@@ -510,18 +515,15 @@ struct GenerateFlashcardsSheet: View {
                                 Text(isGenerating ? "Generando…" : "Generar examen simulado")
                                     .fontWeight(.semibold)
                                 Spacer()
-                                Text(depth == .low ? "~6" : (depth == .medium ? "~12" : "~18"))
-                                    .font(typeScale.secondary)
-                                    .foregroundStyle(.secondary)
                             }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 14)
                             .background(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(canGenerate ? AnyShapeStyle(LinearGradient(colors: [.teal, .cyan], startPoint: .leading, endPoint: .trailing)) : AnyShapeStyle(Color.gray.opacity(0.25)))
+                                    .fill(canGenerate ? AnyShapeStyle(Color.aeroNavy) : AnyShapeStyle(Color.gray.opacity(0.25)))
                             )
                             .foregroundStyle(canGenerate ? .white : .secondary)
-                            .shadow(color: canGenerate ? .teal.opacity(0.28) : .clear, radius: 16, y: 8)
+                            .shadow(color: canGenerate ? Color.aeroNavy.opacity(0.30) : .clear, radius: 16, y: 8)
                         }
                         .disabled(!canGenerate)
                         .controlSize(isLargeCanvas ? .large : .regular)
@@ -552,6 +554,7 @@ struct GenerateFlashcardsSheet: View {
                 }
             }
             .navigationTitle("Generar examen simulado")
+            .toolbarColorScheme(.light, for: .navigationBar)
             .navigationBarTitleDisplayMode(isLargeCanvas ? .automatic : .inline)
             .onAppear { IntelligentStudyAssistant.prewarm() }
             .toolbar {
@@ -622,12 +625,24 @@ struct GenerateFlashcardsSheet: View {
             generationStatus = "Listo!"
             try? await Task.sleep(for: .milliseconds(500))
 
-            drafts = result
+            // Filter by card type preference
+            let filtered: [EditableFlashcard]
+            switch cardTypeFilter {
+            case .open:
+                filtered = result.filter { $0.type == .open }
+            case .multipleChoice:
+                filtered = result.filter { $0.type == .multipleChoice }
+            case .mixed:
+                filtered = result
+            }
             isGenerating = false
 
-            if result.isEmpty {
+            if filtered.isEmpty && cardTypeFilter != .mixed {
+                generationError = "La IA no generó suficientes preguntas de tipo '\(cardTypeFilter.rawValue)'. Prueba con 'Mixto' o agrega más texto al recurso."
+            } else if result.isEmpty {
                 generationError = "No se generó ninguna tarjeta. Prueba añadiendo más texto al recurso."
             } else {
+                drafts = filtered.isEmpty ? result : filtered
                 navigateReview = true
             }
         } catch {
@@ -694,7 +709,7 @@ struct ReviewGeneratedFlashcardsView: View {
                                 HStack(spacing: 10) {
                                     Image(systemName: card.type == .open ? "text.bubble" : "list.bullet.circle")
                                         .foregroundStyle(
-                                            LinearGradient(colors: [.teal, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                            Color.aeroNavy
                                         )
                                         .symbolRenderingMode(.hierarchical)
                                         .accessibilityHidden(true)
@@ -758,54 +773,111 @@ private struct FlashcardEditorFields: View {
     let typeScale: AeroTypeScale
     let isLargeCanvas: Bool
 
-    var body: some View {
-        Group {
-            if isLargeCanvas {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Pregunta")
-                            .font(typeScale.editorLabel)
-                            .foregroundStyle(.secondary)
-                        TextField("Pregunta", text: $card.question, axis: .vertical)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Respuesta")
-                            .font(typeScale.editorLabel)
-                            .foregroundStyle(.secondary)
-                        TextField("Respuesta", text: $card.answer, axis: .vertical)
-                            .textFieldStyle(.roundedBorder)
-                        TextField("Tags (coma)", text: Binding(
-                            get: { card.conceptTags.joined(separator: ", ") },
-                            set: {
-                                card.conceptTags = $0
-                                    .split(separator: ",")
-                                    .map { $0.trimmingCharacters(in: .whitespaces) }
-                                    .filter { !$0.isEmpty }
-                            }
-                        ))
-                        .textFieldStyle(.roundedBorder)
-                    }
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 10) {
-                    TextField("Pregunta", text: $card.question, axis: .vertical)
-                        .textFieldStyle(.roundedBorder)
-                    TextField("Respuesta", text: $card.answer, axis: .vertical)
-                        .textFieldStyle(.roundedBorder)
-                    TextField("Tags (coma)", text: Binding(
-                        get: { card.conceptTags.joined(separator: ", ") },
-                        set: {
-                            card.conceptTags = $0
-                                .split(separator: ",")
-                                .map { $0.trimmingCharacters(in: .whitespaces) }
-                                .filter { !$0.isEmpty }
-                        }
-                    ))
-                    .textFieldStyle(.roundedBorder)
+    // Bindings into options for multipleChoice
+    private var correctBinding: Binding<String> {
+        Binding(
+            get: { card.options?.correct ?? card.answer },
+            set: { val in
+                if card.options != nil {
+                    card.options = FlashcardOptions(correct: val, distractors: card.options?.distractors ?? [])
+                } else {
+                    card.answer = val
                 }
             }
+        )
+    }
+    private func distractorBinding(_ index: Int) -> Binding<String> {
+        Binding(
+            get: { card.options?.distractors.count ?? 0 > index ? card.options!.distractors[index] : "" },
+            set: { val in
+                var dist = card.options?.distractors ?? ["", "", ""]
+                while dist.count <= index { dist.append("") }
+                dist[index] = val
+                card.options = FlashcardOptions(correct: card.options?.correct ?? card.answer, distractors: dist)
+            }
+        )
+    }
+
+    var body: some View {
+        Group {
+            if card.type == .multipleChoice {
+                multipleChoiceFields
+            } else {
+                openFields
+            }
         }
+    }
+
+    // MARK: Open question fields
+    @ViewBuilder private var openFields: some View {
+        if isLargeCanvas {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Pregunta").font(typeScale.editorLabel).foregroundStyle(.secondary)
+                    TextField("Pregunta", text: $card.question, axis: .vertical).textFieldStyle(.roundedBorder)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Respuesta").font(typeScale.editorLabel).foregroundStyle(.secondary)
+                    TextField("Respuesta", text: $card.answer, axis: .vertical).textFieldStyle(.roundedBorder)
+                    HStack(spacing: 6) {
+                        Image(systemName: "tag.fill").font(.caption).foregroundStyle(Color.aeroNavy)
+                        Text("Etiquetas").font(typeScale.editorLabel).foregroundStyle(Color.aeroNavy)
+                    }
+                    TextField("ej: fotosíntesis, célula", text: tagsBinding)
+                        .textFieldStyle(.roundedBorder).font(.caption)
+                }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                TextField("Pregunta", text: $card.question, axis: .vertical).textFieldStyle(.roundedBorder)
+                TextField("Respuesta", text: $card.answer, axis: .vertical).textFieldStyle(.roundedBorder)
+                HStack(spacing: 6) {
+                    Image(systemName: "tag.fill").font(.caption).foregroundStyle(Color.aeroNavy)
+                    Text("Etiquetas").font(typeScale.editorLabel).foregroundStyle(Color.aeroNavy)
+                }
+                TextField("ej: fotosíntesis, célula", text: tagsBinding)
+                    .textFieldStyle(.roundedBorder).font(.caption)
+            }
+        }
+    }
+
+    // MARK: Multiple choice fields
+    @ViewBuilder private var multipleChoiceFields: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Pregunta").font(typeScale.editorLabel).foregroundStyle(.secondary)
+            TextField("Pregunta", text: $card.question, axis: .vertical).textFieldStyle(.roundedBorder)
+
+            Divider()
+
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.caption)
+                Text("Respuesta correcta").font(typeScale.editorLabel).foregroundStyle(.secondary)
+            }
+            TextField("Opción correcta", text: correctBinding, axis: .vertical).textFieldStyle(.roundedBorder)
+
+            HStack(spacing: 8) {
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.red.opacity(0.7)).font(.caption)
+                Text("Distractores (opciones incorrectas)").font(typeScale.editorLabel).foregroundStyle(.secondary)
+            }
+            TextField("Distractor A", text: distractorBinding(0)).textFieldStyle(.roundedBorder)
+            TextField("Distractor B", text: distractorBinding(1)).textFieldStyle(.roundedBorder)
+            TextField("Distractor C", text: distractorBinding(2)).textFieldStyle(.roundedBorder)
+
+            HStack(spacing: 6) {
+                Image(systemName: "tag.fill").font(.caption).foregroundStyle(Color.aeroNavy)
+                Text("Etiquetas").font(typeScale.editorLabel).foregroundStyle(Color.aeroNavy)
+            }
+            TextField("ej: fotosíntesis, célula", text: tagsBinding)
+                .textFieldStyle(.roundedBorder)
+                .font(.caption)
+        }
+    }
+
+    private var tagsBinding: Binding<String> {
+        Binding(
+            get: { card.conceptTags.joined(separator: ", ") },
+            set: { card.conceptTags = $0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } }
+        )
     }
 }
 
@@ -854,11 +926,11 @@ struct GenerateAnkiCardsSheet: View {
                             HStack(alignment: .top, spacing: 12) {
                                 Image(systemName: "rectangle.on.rectangle.angled")
                                     .font(typeScale.sectionHeader)
-                                    .foregroundStyle(LinearGradient(colors: [.teal, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .foregroundStyle(Color.aeroNavy)
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("Flashcards estilo Anki")
                                         .font(typeScale.sectionHeader)
-                                    Text("Tarjetas simples frente/dorso para memorización con repetición espaciada.")
+                                    Text("Tarjetas frente/dorso para memorizar con el algoritmo SM-2 de repetición espaciada. Distintas al examen simulado.")
                                         .font(typeScale.secondary)
                                         .foregroundStyle(.secondary)
                                 }
@@ -872,7 +944,7 @@ struct GenerateAnkiCardsSheet: View {
                                 HStack(alignment: .center, spacing: 12) {
                                     Image(systemName: "apple.intelligence")
                                         .font(typeScale.sectionHeader)
-                                        .foregroundStyle(LinearGradient(colors: [.teal, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                        .foregroundStyle(Color.aeroNavy)
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("Apple Intelligence activa")
                                             .font(typeScale.sectionHeader)
@@ -916,12 +988,10 @@ struct GenerateAnkiCardsSheet: View {
                                 Image(systemName: "slider.horizontal.3")
                                     .font(typeScale.sectionHeader).foregroundStyle(.secondary)
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text("Cantidad orientativa")
-                                        .font(typeScale.sectionHeader)
                                     Picker("Cantidad", selection: $depth) {
-                                        Text("Pocas").tag(IntelligentStudyAssistant.Depth.low)
-                                        Text("Media").tag(IntelligentStudyAssistant.Depth.medium)
-                                        Text("Muchas").tag(IntelligentStudyAssistant.Depth.high)
+                                        Text("8").tag(IntelligentStudyAssistant.Depth.low)
+                                        Text("16").tag(IntelligentStudyAssistant.Depth.medium)
+                                        Text("24").tag(IntelligentStudyAssistant.Depth.high)
                                     }
                                     .pickerStyle(.segmented)
                                     .controlSize(isLargeCanvas ? .large : .regular)
@@ -932,9 +1002,9 @@ struct GenerateAnkiCardsSheet: View {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                     } header: {
-                        SectionHeader("Ajustes", systemImage: "gearshape", typeScale: typeScale) { EmptyView() }
+                        SectionHeader("Número de flashcards", systemImage: "rectangle.on.rectangle.angled", typeScale: typeScale) { EmptyView() }
                     } footer: {
-                        Text(depth == .low ? "~6 tarjetas, repaso rápido." : depth == .medium ? "~12 tarjetas, sesión equilibrada." : "~18 tarjetas, cobertura completa.")
+                        Text(depth == .low ? "Mínimo 8 tarjetas." : depth == .medium ? "Mínimo 16 tarjetas." : "Mínimo 24 tarjetas.")
                             .font(typeScale.secondary)
                     }
 
@@ -1010,18 +1080,16 @@ struct GenerateAnkiCardsSheet: View {
                                 Text(isGenerating ? "Generando…" : "Generar flashcards")
                                     .fontWeight(.semibold)
                                 Spacer()
-                                Text(depth == .low ? "~6" : depth == .medium ? "~12" : "~18")
-                                    .font(typeScale.secondary).foregroundStyle(.secondary)
                             }
                             .padding(.horizontal, 14).padding(.vertical, 14)
                             .background(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .fill(canGenerate
-                                          ? AnyShapeStyle(LinearGradient(colors: [.teal, .cyan], startPoint: .leading, endPoint: .trailing))
+                                          ? AnyShapeStyle(Color.aeroNavy)
                                           : AnyShapeStyle(Color.gray.opacity(0.25)))
                             )
                             .foregroundStyle(canGenerate ? .white : .secondary)
-                            .shadow(color: canGenerate ? .teal.opacity(0.25) : .clear, radius: 16, y: 8)
+                            .shadow(color: canGenerate ? Color.aeroNavy.opacity(0.30) : .clear, radius: 16, y: 8)
                         }
                         .disabled(!canGenerate)
                         .controlSize(isLargeCanvas ? .large : .regular)
@@ -1042,6 +1110,7 @@ struct GenerateAnkiCardsSheet: View {
                 }
             }
             .navigationTitle("Generar flashcards")
+            .toolbarColorScheme(.light, for: .navigationBar)
             .navigationBarTitleDisplayMode(isLargeCanvas ? .automatic : .inline)
             .onAppear { IntelligentStudyAssistant.prewarm() }
             .toolbar {
@@ -1156,12 +1225,12 @@ struct ReviewGeneratedAnkiView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack(spacing: 10) {
                                     Image(systemName: "rectangle.on.rectangle.angled")
-                                        .foregroundStyle(LinearGradient(colors: [.teal, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                        .foregroundStyle(Color.aeroNavy)
                                         .symbolRenderingMode(.hierarchical).accessibilityHidden(true)
                                     Text("Flashcard Anki").font(typeScale.sectionHeader)
                                     Spacer()
                                     Toggle("Incluir", isOn: $card.isIncluded)
-                                        .labelsHidden().tint(.teal)
+                                        .labelsHidden().tint(Color.aeroNavy)
                                         .controlSize(isLargeCanvas ? .large : .regular)
                                 }
 

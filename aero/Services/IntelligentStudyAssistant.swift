@@ -60,9 +60,9 @@ enum IntelligentStudyAssistant {
 
         var approximateCardCount: Int {
             switch self {
-            case .low:    return 5
-            case .medium: return 10
-            case .high:   return 15
+            case .low:    return 8
+            case .medium: return 16
+            case .high:   return 24
             }
         }
     }
@@ -138,7 +138,46 @@ enum IntelligentStudyAssistant {
         // Si no generamos nada, lanzar el primer error
         if allCards.isEmpty, let err = firstError { throw err }
 
-        fmLog("generateFlashcards", "✅ Total: \(allCards.count) tarjetas de \(chunks.count) chunks")
+        // ── Fill passes: lotes pequeños de 4 hasta alcanzar el objetivo ──
+        // Los modelos on-device generan mucho más confiablemente lotes pequeños.
+        let allMaterial = chunks.map { $0.material }.joined(separator: "\n\n---\n\n")
+        let allTitles = chunks.flatMap { $0.resourceList.components(separatedBy: "\n") }
+            .filter { $0.hasPrefix("- ") }.joined(separator: "\n")
+        let combinedChunk = MaterialChunk(
+            resourceList: allTitles.isEmpty ? (chunks.first?.resourceList ?? "") : allTitles,
+            material: String(allMaterial.prefix(3_000))
+        )
+        var fillAttempt = 0
+        let batchSize = 4  // Lotes pequeños = modelo más confiable
+        while allCards.count < target && fillAttempt < 8 {
+            fillAttempt += 1
+            let needed = target - allCards.count
+            let thisBatch = min(needed, batchSize)
+            fmLog("generateFlashcards", "  📋 fill \(fillAttempt) — pidiendo \(thisBatch) (faltan \(needed) de \(target))")
+            do {
+                // totalChunks: 2 → usa GeneratedFlashcardChunk (min:3, max:8) — más fiable
+                let more = try await generateChunk(
+                    chunk: combinedChunk,
+                    cardsTarget: thisBatch,
+                    titleToId: titleToId,
+                    fallbackResourceId: resources.first?.id,
+                    chunkIndex: 0,
+                    totalChunks: 2
+                )
+                let existingQs = Set(allCards.map { String($0.question.lowercased().prefix(50)) })
+                let unique = more.filter { !existingQs.contains(String($0.question.lowercased().prefix(50))) }
+                if unique.isEmpty { break }  // sin nuevas únicas → parar
+                allCards.append(contentsOf: unique)
+                fmLog("generateFlashcards", "  fill \(fillAttempt) → +\(unique.count) (total: \(allCards.count)/\(target))")
+            } catch {
+                fmLog("generateFlashcards", "  ⚠️ fill \(fillAttempt) falló: \(error.localizedDescription)")
+                break
+            }
+        }
+
+        // Recortar al número exacto pedido — nunca más, nunca menos si el material alcanzó
+        allCards = Array(allCards.prefix(target))
+        fmLog("generateFlashcards", "✅ Final: \(allCards.count)/\(target) tarjetas")
         return allCards
     }
 
@@ -159,7 +198,7 @@ enum IntelligentStudyAssistant {
             "REGLAS DE CALIDAD:"
             "1. Basa cada pregunta en una idea central del material. Si la idea no está en el texto, no la uses."
             "2. Las preguntas abiertas ('open') deben pedir al estudiante que explique, relacione, compare, aplique o prediga. Nunca preguntar solo definiciones."
-            "3. Las preguntas de opción múltiple ('multiple_choice') deben tener distractores que representen confusiones reales, no opciones absurdas."
+            "3. OPCIÓN MÚLTIPLE — mcCorrect y mcDistractors deben tener la MISMA LONGITUD (~8-12 palabras máximo) y misma estructura gramatical. mcCorrect es el INCISO CORTO correcto, NO la explicación larga de 'answer'. Los distractores son plausibles: errores típicos de estudiantes, inversiones de causa-efecto, datos casi correctos. Todos los incisos: mayúscula inicial, sin punto final."
             "4. La respuesta modelo debe ser didáctica: incluye el 'por qué' o el mecanismo, no solo el dato."
             "OBLIGATORIO: mezcla cardKind. Al menos el 50% deben ser 'open'. Alterna explícitamente entre tipos; nunca generes solo 'multiple_choice'."
             "sourceResourceTitle debe ser copia exacta del título del recurso en la lista RECURSOS."
@@ -380,7 +419,42 @@ enum IntelligentStudyAssistant {
 
         onProgress?(GenerationProgress(completedChunks: chunks.count, totalChunks: chunks.count))
         if allCards.isEmpty, let err = firstError { throw err }
-        fmLog("generateAnki", "✅ Total: \(allCards.count) tarjetas Anki")
+
+        // Fill passes Anki — lotes pequeños de 4 hasta alcanzar objetivo
+        let ankiAllMaterial = chunks.map { $0.material }.joined(separator: "\n\n---\n\n")
+        let ankiAllTitles = chunks.flatMap { $0.resourceList.components(separatedBy: "\n") }
+            .filter { $0.hasPrefix("- ") }.joined(separator: "\n")
+        let ankiCombinedChunk = MaterialChunk(
+            resourceList: ankiAllTitles.isEmpty ? (chunks.first?.resourceList ?? "") : ankiAllTitles,
+            material: String(ankiAllMaterial.prefix(3_000))
+        )
+        var fillAttempt = 0
+        let ankiBatchSize = 4
+        while allCards.count < target && fillAttempt < 8 {
+            fillAttempt += 1
+            let needed = target - allCards.count
+            let thisBatch = min(needed, ankiBatchSize)
+            fmLog("generateAnki", "  📋 fill \(fillAttempt) — pidiendo \(thisBatch) (faltan \(needed) de \(target))")
+            do {
+                let more = try await generateAnkiChunk(
+                    chunk: ankiCombinedChunk,
+                    cardsTarget: thisBatch,
+                    titleToId: titleToId,
+                    fallbackResourceId: resources.first?.id,
+                    chunkIndex: 0,
+                    totalChunks: 2   // usa GeneratedAnkiChunk (min:3) — más confiable
+                )
+                let existingQs = Set(allCards.map { String($0.front.lowercased().prefix(50)) })
+                let unique = more.filter { !existingQs.contains(String($0.front.lowercased().prefix(50))) }
+                if unique.isEmpty { break }
+                allCards.append(contentsOf: unique)
+                fmLog("generateAnki", "  fill \(fillAttempt) → +\(unique.count) (total: \(allCards.count)/\(target))")
+            } catch { break }
+        }
+
+        // Recortar al número exacto pedido
+        allCards = Array(allCards.prefix(target))
+        fmLog("generateAnki", "✅ Final: \(allCards.count)/\(target) tarjetas Anki")
         return allCards
     }
 
@@ -805,27 +879,54 @@ enum IntelligentStudyAssistant {
         let conceptTags = tags.isEmpty ? [String(a.prefix(24))] : Array(tags)
 
         var options: FlashcardOptions?
+        var resolvedType = type
         if type == .multipleChoice {
             let correct = item.mcCorrect.trimmingCharacters(in: .whitespacesAndNewlines)
             let dist = item.mcDistractors
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
                 .prefix(3)
-            guard !dist.isEmpty else { return nil }
-            options = FlashcardOptions(
-                correct: correct.isEmpty ? a : correct,
-                distractors: Array(dist)
-            )
+            if dist.isEmpty {
+                // Sin distractores → convertir a open en vez de descartar
+                resolvedType = .open
+            } else {
+                let distArray = Array(dist)
+                let rawCorrect = correct.isEmpty ? a : correct
+                options = FlashcardOptions(
+                    correct: normalizeOptionText(rawCorrect),
+                    distractors: distArray.map { normalizeOptionText($0) }
+                )
+            }
         }
 
         return EditableFlashcard(
             resourceId: resourceId,
             question: q,
             answer: a,
-            type: type,
+            type: resolvedType,
             options: options,
             conceptTags: conceptTags
         )
+    }
+
+    /// Capitaliza primera letra, quita punto final.
+    private static func normalizeOptionText(_ text: String) -> String {
+        var t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.hasSuffix(".") { t = String(t.dropLast()) }
+        guard let first = t.first else { return t }
+        return first.uppercased() + t.dropFirst()
+    }
+
+    /// Recorta la respuesta correcta si es desproporcionadamente más larga que los distractores.
+    /// Evita que sea obvia visualmente por su longitud.
+    private static func balanceMCOption(_ correct: String, against distractors: [String]) -> String {
+        guard !distractors.isEmpty else { return correct }
+        let avgDistWords = max(1, distractors.map { $0.split(separator: " ").count }.reduce(0, +) / distractors.count)
+        let correctWords = correct.split(separator: " ")
+        if correctWords.count > Int(Double(avgDistWords) * 2.2) && avgDistWords > 3 {
+            return correctWords.prefix(avgDistWords + 3).joined(separator: " ")
+        }
+        return correct
     }
 
     private static func translateGenerationError(_ error: LanguageModelSession.GenerationError) -> StudyAIError {
