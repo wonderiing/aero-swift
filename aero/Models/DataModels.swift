@@ -9,6 +9,8 @@ final class SDStudy {
     var title: String
     var desc: String
     var createdAt: Date
+    /// Imagen de portada elegida por el usuario. Se guarda fuera del SQLite (.externalStorage).
+    @Attribute(.externalStorage) var coverImageData: Data?
 
     @Relationship(deleteRule: .cascade, inverse: \SDResource.study)
     var resources: [SDResource] = []
@@ -27,6 +29,7 @@ final class SDStudy {
         self.title = title
         self.desc = desc
         self.createdAt = Date()
+        self.coverImageData = nil
     }
 }
 
@@ -352,7 +355,8 @@ struct GapAnalysis {
             let errorRate = Double(stat.errors) / Double(stat.total)
             let dominantError = stat.errorTypes.isEmpty ? nil : Dictionary(grouping: stat.errorTypes, by: { $0 }).max(by: { $0.value.count < $1.value.count })?.key
 
-            if stat.errors >= 1, errorRate >= 0.3 {
+            if stat.errors >= 1 {
+                let severity: GapSeverity = stat.errors == 1 ? .warning : .fault
                 gaps.append(ConceptGap(
                     id: aggKey,
                     concept: stat.displayLabel,
@@ -361,9 +365,10 @@ struct GapAnalysis {
                     errors: stat.errors,
                     dominant_error_type: dominantError,
                     trend: "estable",
-                    last_seen: stat.lastSeen
+                    last_seen: stat.lastSeen,
+                    severity: severity
                 ))
-            } else if stat.total >= 2, stat.errors == 0 || errorRate < 0.3 {
+            } else if stat.total >= 3, stat.errors == 0 {
                 strong.append(StrongConcept(
                     concept: stat.displayLabel,
                     error_rate: errorRate,
@@ -398,8 +403,9 @@ struct GapAnalysis {
 
         for (concept, stat) in ankiConceptStats {
             let errorRate = Double(stat.failures) / Double(stat.total)
-            // Laguna: al menos 2 repasos y tasa de olvido alta
-            if stat.total >= 2 && errorRate > 0.4 {
+            // Laguna: al menos 1 fallo (advertencia si 1, fallo si 2+)
+            if stat.failures >= 1 {
+                let severity: GapSeverity = stat.failures == 1 ? .warning : .fault
                 ankiGaps.append(ConceptGap(
                     id: concept,
                     concept: concept,
@@ -408,10 +414,11 @@ struct GapAnalysis {
                     errors: stat.failures,
                     dominant_error_type: nil,
                     trend: "estable",
-                    last_seen: nil
+                    last_seen: nil,
+                    severity: severity
                 ))
-            // Dominado: al menos 5 repasos y tasa de olvido muy baja
-            } else if stat.total >= 5 && errorRate <= 0.2 {
+            // Dominado: al menos 5 repasos sin ningún fallo
+            } else if stat.total >= 5 && stat.failures == 0 {
                 ankiStrong.append(StrongConcept(
                     concept: concept,
                     error_rate: errorRate,
@@ -460,6 +467,7 @@ struct GapAnalysis {
                 label = tags.joined(separator: " · ")
             }
 
+            let severity: GapSeverity = wrongs == 1 ? .warning : .fault
             fromExam.append(ConceptGap(
                 id: "exam-\(card.id.uuidString)",
                 concept: label,
@@ -468,7 +476,8 @@ struct GapAnalysis {
                 errors: wrongs,
                 dominant_error_type: dominant,
                 trend: "estable",
-                last_seen: attempts.map(\.answeredAt).max()
+                last_seen: attempts.map(\.answeredAt).max(),
+                severity: severity
             ))
         }
         if !fromExam.isEmpty {

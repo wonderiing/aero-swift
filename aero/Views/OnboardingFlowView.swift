@@ -63,15 +63,15 @@ struct OnboardingFlowView: View {
                     .tag(1)
 
                     OnboardingMultiSelectPage(
-                        title: "¿Algo que debamos saber?",
-                        subtitle: "Esto nos ayuda a adaptar la app para ti.",
+                        title: "¿Cómo aprendes mejor?",
+                        subtitle: "Adaptamos la experiencia a tu estilo.",
                         isLargeCanvas: isLargeCanvas,
                         columns: 1,
                         options: [
-                            .init(key: "adhd", systemImage: "brain.head.profile", title: "Tengo TDAH", subtitle: "Me cuesta mantener el foco por mucho tiempo"),
-                            .init(key: "autism", systemImage: "figure.mind.and.body", title: "Estoy en el espectro autista", subtitle: "Prefiero interfaces predecibles y lenguaje claro"),
-                            .init(key: "dyslexia", systemImage: "text.book.closed", title: "Tengo dislexia", subtitle: "Me cuesta leer textos largos"),
-                            .init(key: "low_vision", systemImage: "eye", title: "Baja visión", subtitle: "Necesito texto más grande")
+                            .init(key: "adhd", systemImage: "brain.head.profile", title: "Me distraigo con facilidad", subtitle: "Prefiero contenido breve y directo"),
+                            .init(key: "autism", systemImage: "figure.mind.and.body", title: "Prefiero rutinas y estructura", subtitle: "Me gustan las interfaces claras y predecibles"),
+                            .init(key: "dyslexia", systemImage: "text.book.closed", title: "Leer mucho texto me cansa", subtitle: "Funciono mejor con textos cortos y visuales"),
+                            .init(key: "low_vision", systemImage: "eye", title: "Necesito letra más grande", subtitle: "Me cuesta ver textos con tamaño pequeño")
                         ],
                         selection: $accessibilitySelections,
                         topTrailingAction: .init(title: "Saltar") {

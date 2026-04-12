@@ -13,8 +13,8 @@ struct PracticeSessionView: View {
     @AppStorage("accessibilityNeeds") private var accessibilityNeeds: String = ""
     @AppStorage("focusMode") private var focusMode: Bool = false
 
-    init(study: SDStudy) {
-        _viewModel = StateObject(wrappedValue: PracticeSessionViewModel(study: study))
+    init(study: SDStudy, practiceAll: Bool = false) {
+        _viewModel = StateObject(wrappedValue: PracticeSessionViewModel(study: study, practiceAll: practiceAll))
     }
 
     private var isLargeCanvas: Bool { aeroIsLargeCanvas(horizontalSizeClass: horizontalSizeClass) }
@@ -66,6 +66,11 @@ struct PracticeSessionView: View {
                         usedAppleIntelligence: viewModel.lastEvaluationUsedAppleIntelligence,
                         expandedExplanation: viewModel.expandedExplanation,
                         isExpandingExplanation: viewModel.isExpandingExplanation,
+                        generatedFeedback: viewModel.generatedFeedback,
+                        isFetchingFeedback: viewModel.isFetchingFeedback,
+                        onFeedback: {
+                            Task { await viewModel.generateFeedback() }
+                        },
                         onExplainMore: {
                             Task { await viewModel.explainMore() }
                         },
@@ -155,6 +160,9 @@ struct FlashcardView: View {
     let usedAppleIntelligence: Bool
     let expandedExplanation: String?
     let isExpandingExplanation: Bool
+    let generatedFeedback: String?
+    let isFetchingFeedback: Bool
+    let onFeedback: () -> Void
     let onExplainMore: () -> Void
     @ObservedObject var speech: SpeechInputController
     let isLargeCanvas: Bool
@@ -294,14 +302,6 @@ struct FlashcardView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                // Feedback
-                if let fb = ev.feedback, !fb.isEmpty {
-                    Text(fb)
-                        .font(.body)
-                        .lineSpacing(lineSpacing)
-                        .foregroundStyle(.secondary)
-                }
-
                 if usedAppleIntelligence {
                     Label("Evaluado con Foundation Models", systemImage: "apple.intelligence")
                         .font(.caption)
@@ -309,6 +309,22 @@ struct FlashcardView: View {
                 }
 
                 HStack(spacing: 12) {
+                    // Botón de explicación lazy: solo genera feedback cuando el usuario lo pide
+                    if generatedFeedback == nil {
+                        Button(action: onFeedback) {
+                            if isFetchingFeedback {
+                                ProgressView().scaleEffect(0.9)
+                            } else {
+                                Label("¿Por qué?", systemImage: "questionmark.bubble")
+                                    .font(.body)
+                                    .fontWeight(.medium)
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .disabled(isFetchingFeedback)
+                    }
+
                     Button(action: onExplainMore) {
                         if isExpandingExplanation {
                             ProgressView().scaleEffect(0.9)
@@ -331,6 +347,14 @@ struct FlashcardView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.large)
                     .accessibilityLabel("Leer respuesta correcta en voz alta")
+                }
+
+                if let fb = generatedFeedback, !fb.isEmpty {
+                    Text(fb)
+                        .font(.body)
+                        .lineSpacing(lineSpacing)
+                        .foregroundStyle(.secondary)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
                 if let more = expandedExplanation, !more.isEmpty {

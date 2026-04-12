@@ -95,10 +95,10 @@ enum IntelligentStudyAssistant {
         let titleToId = Dictionary(uniqueKeysWithValues: resources.map { ($0.title, $0.id) })
 
         // ── Dividir material en chunks que quepan en 4096 tokens ──
-        // El modelo usa ~2 tokens/char en español. Instructions + schema + output
-        // consumen ~3000 tokens, dejando ~1000 tokens ≈ ~500 chars para material.
-        // Usamos 1500 chars como límite por chunk (conservador pero seguro).
-        let maxCharsPerChunk = 1_500
+        // El modelo usa ~1.5 tokens/char en español. Instructions + schema (condensado) + output
+        // consumen ~2600 tokens, dejando ~1500 tokens ≈ ~1000 chars para material.
+        // Usamos 1800 chars como límite por chunk (ajustado tras condensar @Guide).
+        let maxCharsPerChunk = 1_800
         let chunks = buildMaterialChunks(resources: resources, maxCharsPerChunk: maxCharsPerChunk)
         let cardsPerChunk = max(2, target / max(1, chunks.count))
 
@@ -138,8 +138,9 @@ enum IntelligentStudyAssistant {
         // Si no generamos nada, lanzar el primer error
         if allCards.isEmpty, let err = firstError { throw err }
 
-        // ── Fill passes: lotes pequeños de 4 hasta alcanzar el objetivo ──
-        // Los modelos on-device generan mucho más confiablemente lotes pequeños.
+        // ── Fill passes: lotes de 6, máximo 4 intentos ──
+        // Lotes un poco más grandes reducen llamadas totales; 4 intentos bastan
+        // para alcanzar el target sin degradar tiempos.
         let allMaterial = chunks.map { $0.material }.joined(separator: "\n\n---\n\n")
         let allTitles = chunks.flatMap { $0.resourceList.components(separatedBy: "\n") }
             .filter { $0.hasPrefix("- ") }.joined(separator: "\n")
@@ -148,14 +149,13 @@ enum IntelligentStudyAssistant {
             material: String(allMaterial.prefix(3_000))
         )
         var fillAttempt = 0
-        let batchSize = 4  // Lotes pequeños = modelo más confiable
-        while allCards.count < target && fillAttempt < 8 {
+        let batchSize = 6
+        while allCards.count < target && fillAttempt < 4 {
             fillAttempt += 1
             let needed = target - allCards.count
             let thisBatch = min(needed, batchSize)
             fmLog("generateFlashcards", "  📋 fill \(fillAttempt) — pidiendo \(thisBatch) (faltan \(needed) de \(target))")
             do {
-                // totalChunks: 2 → usa GeneratedFlashcardChunk (min:3, max:8) — más fiable
                 let more = try await generateChunk(
                     chunk: combinedChunk,
                     cardsTarget: thisBatch,
@@ -166,7 +166,7 @@ enum IntelligentStudyAssistant {
                 )
                 let existingQs = Set(allCards.map { String($0.question.lowercased().prefix(50)) })
                 let unique = more.filter { !existingQs.contains(String($0.question.lowercased().prefix(50))) }
-                if unique.isEmpty { break }  // sin nuevas únicas → parar
+                if unique.isEmpty { break }
                 allCards.append(contentsOf: unique)
                 fmLog("generateFlashcards", "  fill \(fillAttempt) → +\(unique.count) (total: \(allCards.count)/\(target))")
             } catch {
@@ -387,7 +387,7 @@ enum IntelligentStudyAssistant {
 
         let target = depth.approximateCardCount
         let titleToId = Dictionary(uniqueKeysWithValues: resources.map { ($0.title, $0.id) })
-        let maxCharsPerChunk = 1_500
+        let maxCharsPerChunk = 1_800
         let chunks = buildMaterialChunks(resources: resources, maxCharsPerChunk: maxCharsPerChunk)
         let cardsPerChunk = max(2, target / max(1, chunks.count))
 
@@ -419,7 +419,7 @@ enum IntelligentStudyAssistant {
         onProgress?(GenerationProgress(completedChunks: chunks.count, totalChunks: chunks.count))
         if allCards.isEmpty, let err = firstError { throw err }
 
-        // Fill passes Anki — lotes pequeños de 4 hasta alcanzar objetivo
+        // Fill passes Anki — lotes de 6, máximo 4 intentos
         let ankiAllMaterial = chunks.map { $0.material }.joined(separator: "\n\n---\n\n")
         let ankiAllTitles = chunks.flatMap { $0.resourceList.components(separatedBy: "\n") }
             .filter { $0.hasPrefix("- ") }.joined(separator: "\n")
@@ -428,8 +428,8 @@ enum IntelligentStudyAssistant {
             material: String(ankiAllMaterial.prefix(3_000))
         )
         var fillAttempt = 0
-        let ankiBatchSize = 4
-        while allCards.count < target && fillAttempt < 8 {
+        let ankiBatchSize = 6
+        while allCards.count < target && fillAttempt < 4 {
             fillAttempt += 1
             let needed = target - allCards.count
             let thisBatch = min(needed, ankiBatchSize)
@@ -441,7 +441,7 @@ enum IntelligentStudyAssistant {
                     titleToId: titleToId,
                     fallbackResourceId: resources.first?.id,
                     chunkIndex: 0,
-                    totalChunks: 2   // usa GeneratedAnkiChunk (min:3) — más confiable
+                    totalChunks: 2
                 )
                 let existingQs = Set(allCards.map { String($0.front.lowercased().prefix(50)) })
                 let unique = more.filter { !existingQs.contains(String($0.front.lowercased().prefix(50))) }
@@ -591,7 +591,7 @@ enum IntelligentStudyAssistant {
         }.joined(separator: "\n")
 
         let titleToId = Dictionary(uniqueKeysWithValues: resources.map { ($0.title, $0.id) })
-        let maxCharsPerChunk = 1_500
+        let maxCharsPerChunk = 1_800
         let chunks = buildMaterialChunks(resources: resources, maxCharsPerChunk: maxCharsPerChunk)
 
         fmLog("generateFromGaps", "→ \(gaps.prefix(5).count) lagunas, chunks=\(chunks.count)")
@@ -778,6 +778,27 @@ enum IntelligentStudyAssistant {
         cardType: FlashcardType,
         options: FlashcardOptions?
     ) async throws -> CreateAttemptDto {
+        // ── Atajo MC: evaluación determinista, sin IA ──
+        // Opción múltiple no necesita modelo — la respuesta es correcta o no.
+        if cardType == .multipleChoice, let opts = options {
+            let result = AnswerEvaluationService.evaluate(
+                question: question,
+                correctAnswer: correctAnswer,
+                userAnswer: nil,
+                selectedMultipleChoice: userAnswer,
+                cardType: .multipleChoice,
+                options: opts
+            )
+            fmLog("evaluateAnswer", "→ MC determinista (sin IA) isCorrect=\(result.isCorrect)")
+            return result
+        }
+
+        // ── Atajo open: respuestas que claramente no intentan contestar ──
+        if cardType == .open, let canned = AnswerEvaluationService.openAnswerIfClearlyNonAttempt(userAnswer: userAnswer) {
+            fmLog("evaluateAnswer", "→ canned non-attempt (sin IA)")
+            return canned
+        }
+
         if !isAppleIntelligenceReady {
             let ready = await waitForModelReadiness(timeout: 5)
             if !ready {
@@ -785,28 +806,22 @@ enum IntelligentStudyAssistant {
             }
         }
 
-        if cardType == .open, let canned = AnswerEvaluationService.openAnswerIfClearlyNonAttempt(userAnswer: userAnswer) {
-            fmLog("evaluateAnswer", "→ canned non-attempt (sin IA)")
-            return canned
-        }
-
         let rawNeeds = UserDefaults.standard.string(forKey: "accessibilityNeeds") ?? ""
         let needs = Set(rawNeeds.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
 
         let instructions = Instructions {
             "Eres un tutor justo que evalúa respuestas de estudio en español."
-            "Evalúas si el estudiante demuestra comprensión del tema de la pregunta, no si copió la redacción modelo."
-            "CRÍTICO — respuestas que NO cuentan como intento válido: texto sin relación con la pregunta, broma, relleno, slang evasivo (p. ej. \"nvm\", \"random\", \"lo que sea\"), o negaciones sin explicar (p. ej. solo \"no sé\" / \"ni idea\" sin ningún contenido sobre el tema). En todos esos casos: isCorrect=false, errorTypeToken=conceptual (o confusion si aplica), NUNCA uses incompleto."
-            "incompleto SOLO cuando isCorrect=true: la respuesta SÍ trata el tema de la pregunta pero le faltan matices o ideas importantes. Si no trata el tema, no es incompleto — es incorrecta."
+            "Tu criterio principal: ¿el estudiante demuestra que entiende el concepto que se pregunta? No importa si la redacción es diferente a la respuesta modelo, imprecisa o incompleta — si la idea central es correcta, la respuesta es correcta."
+            "RESPUESTAS AMBIGUAS: si la respuesta es ambigua pero contiene la idea correcta o una aproximación válida al tema, márcala como isCorrect=true con errorTypeToken=incompleto. Solo marca isCorrect=false si la respuesta está claramente equivocada o no tiene relación con el tema."
             "JERARQUÍA DE EVALUACIÓN (aplica en este orden):"
-            "0. ¿La respuesta ignora el enunciado, es irrelevante o es evasiva sin sustancia? → isCorrect=false, errorTypeToken=conceptual."
-            "1. ¿Afirma algo claramente erróneo sobre el tema? → isCorrect=false, errorTypeToken=conceptual o confusion."
-            "2. ¿Aborda el tema y es razonablemente correcta pero le faltan ideas clave? → isCorrect=true, errorTypeToken=incompleto, missingConcepts."
-            "3. ¿Aborda el tema y es adecuada? → isCorrect=true, errorTypeToken vacío."
-            "Si dudas entre \"no intentó responder\" e \"incompleto\", elige \"no intentó\" (isCorrect=false). Sé exigente con la relevancia."
-            "El feedback siempre constructivo y en español: si es incorrecta o irrelevante, di con claridad que debe responder al contenido de la pregunta."
+            "0. ¿La respuesta es completamente irrelevante, es broma, relleno o slang sin contenido (p. ej. 'nvm', 'lo que sea', 'no sé' sin nada más)? → isCorrect=false, errorTypeToken=conceptual."
+            "1. ¿Afirma algo claramente erróneo o contradictorio sobre el tema? → isCorrect=false, errorTypeToken=conceptual o confusion."
+            "2. ¿La respuesta es ambigua, incompleta o imprecisa pero toca el tema correctamente? → isCorrect=true, errorTypeToken=incompleto, rellena missingConcepts con lo que faltó."
+            "3. ¿La respuesta aborda el tema y es sustancialmente correcta? → isCorrect=true, errorTypeToken vacío."
+            "REGLA DE BENEFICIO DE DUDA: si dudas entre isCorrect=true y isCorrect=false, elige isCorrect=true con errorTypeToken=incompleto. Solo marca isCorrect=false cuando estés seguro de que la respuesta es incorrecta o irrelevante."
+            "incompleto puede usarse con isCorrect=true. NUNCA uses incompleto con isCorrect=false."
             if needs.contains("adhd") {
-                "IMPORTANTE (TDAH): el feedback breve y directo. Si la respuesta sí aborda el tema, puedes empezar con algo que hizo bien. Si es irrelevante o evasiva, no inventes elogios: di qué se pedía y anima a intentarlo."
+                "IMPORTANTE (TDAH): el feedback breve y directo. Empieza con lo que hizo bien antes de señalar lo que faltó."
             }
             if needs.contains("autism") {
                 "IMPORTANTE (Autismo): usa lenguaje directo y concreto. Evita metáforas, sarcasmo o lenguaje ambiguo. Di exactamente qué faltó."
@@ -828,13 +843,13 @@ enum IntelligentStudyAssistant {
         \(optText)
         Respuesta del estudiante: \(userAnswer ?? "")
 
-        Criterio: si la respuesta no intenta responder al tema de la pregunta (irrelevante, evasiva o sin sustancia), isCorrect=false; no uses "incompleto" salvo que sí aborde el tema pero le falte profundidad.
+        Recuerda: si la respuesta toca el tema aunque sea de forma ambigua o incompleta, es isCorrect=true con incompleto. Solo isCorrect=false si está claramente equivocada o es irrelevante.
         """
 
         fmLog("evaluateAnswer", "→ prompt=\(prompt.count)chars")
 
         return try await executeGeneration(tag: "evaluateAnswer") {
-            try await session.respond(to: prompt, generating: GeneratedAnswerEvaluation.self)
+            try await session.respond(to: prompt, generating: GeneratedAnswerVerdict.self)
         } transform: { response in
             fmLog("evaluateAnswer", "✅ isCorrect=\(response.content.isCorrect)")
             let ev = response.content
@@ -852,9 +867,62 @@ enum IntelligentStudyAssistant {
                 errorType: mappedError,
                 missingConcepts: ev.missingConcepts,
                 incorrectConcepts: ev.incorrectConcepts,
-                feedback: ev.feedback,
+                feedback: nil,
                 confidenceScore: min(1, max(0, ev.confidenceScore))
             )
+        }
+    }
+
+    // MARK: - Feedback lazy (generado solo si el usuario lo pide)
+
+    static func generateAnswerFeedback(
+        question: String,
+        correctAnswer: String,
+        userAnswer: String?,
+        isCorrect: Bool,
+        errorType: String?
+    ) async throws -> String {
+        if !isAppleIntelligenceReady {
+            let ready = await waitForModelReadiness(timeout: 5)
+            if !ready {
+                throw StudyAIError.modelUnavailable(unavailabilityReasonDescription())
+            }
+        }
+
+        let rawNeeds = UserDefaults.standard.string(forKey: "accessibilityNeeds") ?? ""
+        let needs = Set(rawNeeds.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+
+        let instructions = Instructions {
+            "Eres un tutor que explica brevemente por qué una respuesta de estudio es correcta o incorrecta."
+            "El feedback debe ser breve (2-4 frases), didáctico y en español."
+            if needs.contains("adhd") {
+                "IMPORTANTE (TDAH): sé directo y conciso. Si algo estuvo bien, menciona primero eso."
+            }
+            if needs.contains("autism") {
+                "IMPORTANTE (Autismo): usa lenguaje directo y concreto. Sin metáforas ni ambigüedad."
+            }
+        }
+
+        let session = LanguageModelSession(instructions: instructions)
+
+        let verdict = isCorrect ? "CORRECTA" : "INCORRECTA"
+        let errorHint = errorType.map { " (tipo de error: \($0))" } ?? ""
+        let prompt = """
+        Pregunta: \(question)
+        Respuesta modelo: \(correctAnswer)
+        Respuesta del estudiante: \(userAnswer ?? "")
+        Veredicto: \(verdict)\(errorHint)
+
+        Explica brevemente por qué la respuesta es \(verdict.lowercased()) y qué debería recordar el estudiante.
+        """
+
+        fmLog("generateAnswerFeedback", "→ prompt=\(prompt.count)chars")
+
+        return try await executeGeneration(tag: "generateAnswerFeedback") {
+            try await session.respond(to: prompt, generating: GeneratedAnswerFeedback.self)
+        } transform: { response in
+            fmLog("generateAnswerFeedback", "✅ \(response.content.feedback.count)chars")
+            return response.content.feedback
         }
     }
 

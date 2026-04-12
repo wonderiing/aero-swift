@@ -25,10 +25,15 @@ final class PracticeSessionViewModel: ObservableObject {
     @Published var lastEvaluationUsedAppleIntelligence = false
     @Published var consecutiveCorrectStreak = 0
 
-    var modelContext: ModelContext?
+    @Published var generatedFeedback: String?
+    @Published var isFetchingFeedback = false
 
-    init(study: SDStudy) {
+    var modelContext: ModelContext?
+    private let practiceAll: Bool
+
+    init(study: SDStudy, practiceAll: Bool = false) {
         self.study = study
+        self.practiceAll = practiceAll
     }
 
     func startSession() {
@@ -37,13 +42,19 @@ final class PracticeSessionViewModel: ObservableObject {
         sessionAnsweredCount = 0
         consecutiveCorrectStreak = 0
 
-        let now = Date()
-        let queue = study.flashcards
-            .filter { $0.nextReviewAt <= now }
-            .sorted { $0.nextReviewAt < $1.nextReviewAt }
+        let queue: [SDFlashcard]
+        if practiceAll {
+            // Modo libre: todas las tarjetas mezcladas, ignorando SM-2
+            queue = study.flashcards.shuffled()
+        } else {
+            let now = Date()
+            queue = study.flashcards
+                .filter { $0.nextReviewAt <= now }
+                .sorted { $0.nextReviewAt < $1.nextReviewAt }
+        }
 
         let analysis = GapAnalysis.compute(flashcards: study.flashcards)
-        let prioritized = prioritizeQueue(queue, gaps: analysis)
+        let prioritized = practiceAll ? queue : prioritizeQueue(queue, gaps: analysis)
         flashcards = applySessionStyleLimits(to: prioritized)
         currentIndex = 0
         prepareCurrentCard()
@@ -74,6 +85,7 @@ final class PracticeSessionViewModel: ObservableObject {
         evaluationResult = nil
         isShowingAnswer = false
         expandedExplanation = nil
+        generatedFeedback = nil
         lastEvaluationUsedAppleIntelligence = false
         guard currentIndex < flashcards.count else {
             shuffledOptions = []
@@ -180,6 +192,29 @@ final class PracticeSessionViewModel: ObservableObject {
         }
     }
 
+    func generateFeedback() async {
+        guard currentIndex < flashcards.count, let ev = evaluationResult else { return }
+        isFetchingFeedback = true
+        defer { isFetchingFeedback = false }
+
+        if IntelligentStudyAssistant.isAppleIntelligenceReady {
+            let card = flashcards[currentIndex]
+            do {
+                generatedFeedback = try await IntelligentStudyAssistant.generateAnswerFeedback(
+                    question: card.question,
+                    correctAnswer: card.answer,
+                    userAnswer: answerTextForEvaluation(card: card),
+                    isCorrect: ev.isCorrect,
+                    errorType: ev.errorTypeRaw
+                )
+            } catch {
+                generatedFeedback = "No se pudo generar la explicación: \(error.localizedDescription)"
+            }
+        } else {
+            generatedFeedback = "Activa Apple Intelligence en este dispositivo para ver la explicación."
+        }
+    }
+
     func explainMore() async {
         guard currentIndex < flashcards.count else { return }
         let card = flashcards[currentIndex]
@@ -192,7 +227,7 @@ final class PracticeSessionViewModel: ObservableObject {
                     question: card.question,
                     correctAnswer: card.answer,
                     userAnswer: answerTextForEvaluation(card: card),
-                    feedbackSoFar: evaluationResult?.feedback,
+                    feedbackSoFar: generatedFeedback,
                     resourceContext: nil
                 )
             } catch {

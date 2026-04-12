@@ -25,60 +25,55 @@ struct GeneratedFlashcardChunk {
 
 @Generable
 struct GeneratedFlashcardItem {
-    @Guide(description: """
-    Pregunta pedagógica en español. Reglas ESTRICTAS:
-    1. Cada pregunta debe testear comprensión profunda, NO memorización de definiciones. Prohibido el patrón '¿Qué es X?' salvo una vez por lote.
-    2. VARÍA el estilo en cada tarjeta: comparación (¿En qué se diferencia X de Y?), causa-efecto (¿Por qué ocurre X? / ¿Qué consecuencia tiene…?), aplicación (¿Cómo aplicarías X en el contexto Y?), proceso (¿Cuáles son los pasos de…?), error común (¿Por qué es incorrecto pensar que…?), relación (¿Cómo influye X en Y?), predicción (¿Qué pasaría si se elimina X?).
-    3. La pregunta debe poder responderse SOLO con el material proporcionado.
-    4. Redacción clara, directa y sin ambigüedad.
-    """)
+    @Guide(description: "Pregunta en español que teste comprensión profunda (comparar, explicar causa-efecto, aplicar, predecir). Basada solo en el material. Clara y directa.")
     var question: String
 
-    @Guide(description: "Respuesta modelo completa: explica el concepto con suficiente detalle para que un estudiante entienda por qué es correcto. Máximo 3 frases. Incluye el 'por qué' o el 'mecanismo', no solo el dato.")
+    @Guide(description: "Respuesta didáctica: máximo 3 frases, incluye el por qué o mecanismo, no solo el dato.")
     var answer: String
 
-    /// Tipo de tarjeta (constrained por el enum — el modelo no puede generar otro valor).
-    @Guide(description: "Tipo de tarjeta. DEBES variar: aproximadamente 60% deben ser 'open' (pregunta abierta, requiere elaborar la respuesta) y 40% 'multiple_choice' (concepto concreto con opciones). Nunca generes solo un tipo; alterna de forma explícita.")
+    @Guide(description: "~60% open, ~40% multiple_choice. Alterna tipos.")
     var cardKind: GeneratedCardKind
 
-    @Guide(description: "Solo para multiple_choice: la respuesta correcta, formulada como frase completa y concisa. Para open: string vacío.")
+    @Guide(description: "Solo multiple_choice: respuesta correcta concisa (8-12 palabras). Open: vacío.")
     var mcCorrect: String
 
-    @Guide(description: "Solo para multiple_choice: exactamente 3 distractores plausibles del mismo dominio. Cada distractor debe ser incorrecto pero creíble (errores típicos de estudiantes, confusiones frecuentes). Para open: lista vacía.", .maximumCount(3))
+    @Guide(description: "Solo multiple_choice: 3 distractores plausibles, misma longitud que mcCorrect. Open: vacío.", .maximumCount(3))
     var mcDistractors: [String]
 
-    @Guide(description: "1 a 3 términos técnicos clave del material que cubre esta tarjeta", .minimumCount(1), .maximumCount(3))
+    @Guide(description: "1-3 términos clave del material", .minimumCount(1), .maximumCount(3))
     var conceptTags: [String]
 
-    @Guide(description: "Copia exacta del título del recurso de origen tal como aparece en la lista RECURSOS")
+    @Guide(description: "Título exacto del recurso de origen de la lista RECURSOS")
     var sourceResourceTitle: String
 }
 
 // MARK: - Evaluación de respuesta
 
-@Generable(description: "Evaluación de la respuesta del estudiante")
-struct GeneratedAnswerEvaluation {
-    @Guide(description: """
-    true solo si la respuesta muestra comprensión sustantiva del tema de la pregunta (aunque sea breve o informal).
-    false si: (a) ignora el enunciado o es irrelevante/evasiva; (b) es texto aleatorio, broma o slang sin contenido (p. ej. "nvm", "random", "no sé" sin desarrollar); (c) error conceptual.
-    NO marques true por ser "amable": una respuesta que no trata el tema es false, no "incompleto".
-    """)
+/// Veredicto rápido: solo determina si la respuesta es correcta/incorrecta.
+/// No incluye feedback para mantener la latencia baja.
+@Generable(description: "Veredicto de la respuesta del estudiante")
+struct GeneratedAnswerVerdict {
+    @Guide(description: "true si demuestra comprensión del tema. false si es irrelevante, evasiva o errónea.")
     var isCorrect: Bool
 
-    @Guide(description: "Usa 'incompleto' SOLO cuando isCorrect=true y la respuesta SÍ aborda el tema pero faltan ideas clave. NUNCA uses 'incompleto' si isCorrect=false. Para evasivas o fuera de tema usa 'conceptual' o 'confusion'. Deja vacío si la respuesta es totalmente correcta.")
+    @Guide(description: "'incompleto' solo si isCorrect=true pero faltan ideas. 'conceptual'/'confusion' si isCorrect=false. Vacío si correcta.")
     var errorTypeToken: String
 
-    @Guide(description: "Solo cuando errorTypeToken='incompleto': lista de conceptos o ideas que el estudiante no mencionó pero eran relevantes.", .maximumCount(4))
+    @Guide(description: "Conceptos que faltan (solo si incompleto)", .maximumCount(4))
     var missingConcepts: [String]
 
-    @Guide(description: "Solo cuando isCorrect=false: lista de afirmaciones incorrectas o conceptos confundidos en la respuesta.", .maximumCount(4))
+    @Guide(description: "Conceptos erróneos (solo si isCorrect=false)", .maximumCount(4))
     var incorrectConcepts: [String]
 
-    @Guide(description: "Retroalimentación breve y didáctica en español")
-    var feedback: String
-
-    @Guide(description: "Confianza en la evaluación entre 0 y 1", .minimum(0), .maximum(1))
+    @Guide(description: "Confianza 0-1", .minimum(0), .maximum(1))
     var confidenceScore: Double
+}
+
+/// Feedback explicativo generado de forma lazy (solo cuando el usuario lo pide).
+@Generable(description: "Feedback didáctico sobre la respuesta del estudiante")
+struct GeneratedAnswerFeedback {
+    @Guide(description: "Feedback breve y didáctico en español: explica por qué la respuesta es correcta o incorrecta y qué debería mejorar.")
+    var feedback: String
 }
 
 // MARK: - Anki Cards
@@ -97,24 +92,16 @@ struct GeneratedAnkiChunk {
 
 @Generable
 struct GeneratedAnkiItem {
-    @Guide(description: """
-    Frente de la tarjeta (pregunta o término): máximo 12 palabras, inequívoco, atómico (un solo concepto).
-    Varía el formato: definición inversa, mecanismo, causa-efecto, clasificación, comparación, o cloze implícito.
-    El estudiante debe poder decir en segundos si sabe o no sabe la respuesta.
-    """)
+    @Guide(description: "Frente: máximo 12 palabras, atómico (un concepto). Varía formato: definición, mecanismo, causa-efecto, cloze.")
     var front: String
 
-    @Guide(description: """
-    Dorso de la tarjeta (respuesta): empieza con la respuesta directa en 1 frase (15-35 palabras).
-    Si el concepto es abstracto, añade una segunda frase con un ejemplo concreto o analogía del material.
-    NUNCA repitas la pregunta. NUNCA más de 2 frases.
-    """)
+    @Guide(description: "Dorso: respuesta directa en 1-2 frases (15-35 palabras). No repitas la pregunta.")
     var back: String
 
-    @Guide(description: "1 a 3 etiquetas conceptuales precisas que identifican el tema de esta tarjeta", .minimumCount(1), .maximumCount(3))
+    @Guide(description: "1-3 etiquetas del tema", .minimumCount(1), .maximumCount(3))
     var tags: [String]
 
-    @Guide(description: "Copia exacta del título del recurso de origen tal como aparece en la lista RECURSOS")
+    @Guide(description: "Título exacto del recurso de origen de la lista RECURSOS")
     var sourceResourceTitle: String
 }
 
@@ -136,16 +123,12 @@ struct GeneratedGapResourcePack {
 
 @Generable
 struct GeneratedGapResourceItem {
-    @Guide(description: "Título breve y descriptivo (máximo 70 caracteres)")
+    @Guide(description: "Título breve (máx 70 chars)")
     var title: String
 
-    @Guide(description: """
-    Contenido en Markdown (## secciones, listas con guiones, **negritas**).
-    Explica el concepto, por qué suele fallarse y un ejemplo breve tomado del material.
-    Entre 200 y 900 palabras. No cites fuentes externas ni inventes datos fuera del material.
-    """)
+    @Guide(description: "Markdown: explica el concepto, por qué se falla y un ejemplo del material. 200-900 palabras.")
     var content: String
 
-    @Guide(description: "Qué laguna cubre (palabras clave tomadas de la lista LAGUNAS)")
+    @Guide(description: "Laguna que cubre (de la lista LAGUNAS)")
     var gapConcept: String
 }

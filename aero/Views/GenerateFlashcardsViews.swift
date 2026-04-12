@@ -190,9 +190,13 @@ struct GenerationProgressOverlay: View {
     let typeScale: AeroTypeScale
 
     @State private var pulse = false
+    /// El progreso que se muestra visualmente — se anima suavemente.
+    @State private var displayedProgress: CGFloat = 0
+    /// Copia del progreso real accesible desde el background task.
+    @State private var realProgress: CGFloat = 0
 
     private var iconName: String {
-        switch progress {
+        switch displayedProgress {
         case ..<0.15: return "doc.text.magnifyingglass"
         case ..<0.45: return "brain.head.profile"
         case ..<0.75: return "list.bullet.rectangle"
@@ -217,7 +221,7 @@ struct GenerationProgressOverlay: View {
                     .scaleEffect(pulse ? 1.12 : 0.95)
 
                 Circle()
-                    .trim(from: 0, to: progress)
+                    .trim(from: 0, to: displayedProgress)
                     .stroke(
                         AngularGradient(
                             colors: [Color.aeroNavy, Color.aeroLavender, Color.aeroNavy],
@@ -252,13 +256,13 @@ struct GenerationProgressOverlay: View {
                             .fill(
                                 Color.aeroNavy
                             )
-                            .frame(width: max(0, geo.size.width * progress), height: 6)
+                            .frame(width: max(0, geo.size.width * displayedProgress), height: 6)
                     }
                 }
                 .frame(height: 6)
                 .frame(maxWidth: 220)
 
-                Text("\(Int(progress * 100))%")
+                Text("\(Int(displayedProgress * 100))%")
                     .font(typeScale.pill)
                     .foregroundStyle(.secondary)
                     .contentTransition(.numericText())
@@ -273,6 +277,30 @@ struct GenerationProgressOverlay: View {
         .onAppear {
             withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
                 pulse = true
+            }
+            realProgress = progress
+            displayedProgress = progress
+        }
+        .onChange(of: progress) { _, newValue in
+            realProgress = newValue
+            withAnimation(.spring(response: 0.85, dampingFraction: 0.82)) {
+                displayedProgress = newValue
+            }
+        }
+        // Tick simulado: avanza lentamente entre actualizaciones reales para que
+        // la barra nunca se vea detenida. Se limita a realProgress + 0.06 para
+        // no adelantarse demasiado al progreso real.
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(130))
+                await MainActor.run {
+                    let ceiling = min(realProgress + 0.06, 0.93)
+                    if displayedProgress < ceiling {
+                        withAnimation(.linear(duration: 0.13)) {
+                            displayedProgress = min(displayedProgress + 0.0018, ceiling)
+                        }
+                    }
+                }
             }
         }
     }

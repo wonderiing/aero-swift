@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import PhotosUI
 import UniformTypeIdentifiers
 
 // MARK: - Main View
@@ -8,10 +9,30 @@ struct StudyDetailView: View {
     @StateObject private var viewModel: StudyDetailViewModel
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @EnvironmentObject private var podcastState: PodcastPlayerState
+    @AppStorage("podcastEnabled") private var podcastEnabled: Bool = false
+    @AppStorage("accessibilityNeeds") private var accessibilityNeeds: String = ""
+    @AppStorage("sessionStyle") private var sessionStyle: String = ""
     @State private var selectedTab = 0
     @State private var showingAnkiSession = false
 
     var onNavigateBack: (() -> Void)? = nil
+
+    private var showPodcastButton: Bool {
+        podcastEnabled
+        || accessibilityNeeds.contains("dyslexia")
+        || sessionStyle.contains("prefer_audio")
+    }
+
+    private var mastery: (percent: Int, progress: Double) {
+        let s = TopicMasterySnapshot.compute(from: viewModel)
+        return (s.percent, s.progress)
+    }
+
+    func saveCoverImage(_ data: Data) {
+        viewModel.study.coverImageData = data
+        try? modelContext.save()
+    }
 
     init(study: SDStudy, onNavigateBack: (() -> Void)? = nil) {
         self.onNavigateBack = onNavigateBack
@@ -64,12 +85,17 @@ struct StudyDetailView: View {
         VStack(spacing: 0) {
             StudyHeroHeader(
                 study: viewModel.study,
+
                 reviewCount: viewModel.reviewQueue.count,
                 ankiCardCount: viewModel.ankiCards.count,
                 ankiDueCount: viewModel.ankiReviewQueue.count,
+                masteryPercent: mastery.percent,
+                masteryProgress: mastery.progress,
                 isLargeCanvas: true,
                 onNavigateBack: onNavigateBack,
-                onStartAnkiSession: { showingAnkiSession = true }
+                onStartAnkiSession: { showingAnkiSession = true },
+                onStartPodcast: showPodcastButton ? { podcastState.start(study: viewModel.study) } : nil,
+                onImagePicked: { saveCoverImage($0) }
             )
             StudyTabPicker(selectedTab: $selectedTab, isLargeCanvas: true)
             Divider()
@@ -94,9 +120,8 @@ struct StudyDetailView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        // Keep toolbar visible so macOS shows the system sidebar toggle in the window bar
         .navigationTitle("")
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
     }
 
     // MARK: Compact — original tab picker layout
@@ -106,12 +131,17 @@ struct StudyDetailView: View {
         VStack(spacing: 0) {
             StudyHeroHeader(
                 study: viewModel.study,
+
                 reviewCount: viewModel.reviewQueue.count,
                 ankiCardCount: viewModel.ankiCards.count,
                 ankiDueCount: viewModel.ankiReviewQueue.count,
+                masteryPercent: mastery.percent,
+                masteryProgress: mastery.progress,
                 isLargeCanvas: false,
                 onNavigateBack: nil,
-                onStartAnkiSession: { showingAnkiSession = true }
+                onStartAnkiSession: { showingAnkiSession = true },
+                onStartPodcast: showPodcastButton ? { podcastState.start(study: viewModel.study) } : nil,
+                onImagePicked: { saveCoverImage($0) }
             )
             StudyTabPicker(selectedTab: $selectedTab, isLargeCanvas: false)
 
@@ -166,186 +196,272 @@ struct StudyHeroHeader: View {
     let reviewCount: Int
     let ankiCardCount: Int
     let ankiDueCount: Int
+    let masteryPercent: Int
+    let masteryProgress: Double
     let isLargeCanvas: Bool
-    /// En iPad / Mac: botón para volver a la biblioteca sobre el hero.
     var onNavigateBack: (() -> Void)? = nil
     var onStartAnkiSession: (() -> Void)? = nil
+    var onStartPodcast: (() -> Void)? = nil
+    var onImagePicked: ((Data) -> Void)? = nil
 
     @State private var wikipediaThumbnail: URL?
     @State private var wikipediaFetchFinished = false
+    @State private var pickerItem: PhotosPickerItem?
 
-    private var hasPractice: Bool { reviewCount > 0 || ankiCardCount > 0 }
+    private var thumbSize: CGFloat { isLargeCanvas ? 96 : 68 }
+    private var headerPad: CGFloat { isLargeCanvas ? 24 : 14 }
 
-    private var heroHeight: CGFloat {
-        if hasPractice {
-            return isLargeCanvas ? 328 : 256
-        }
-        return isLargeCanvas ? 288 : 220
+    /// Imagen custom tiene prioridad sobre Wikipedia.
+    /// Se lee de study.coverImageData directamente para que SwiftUI detecte el cambio.
+    private var customUIImage: UIImage? {
+        guard let data = study.coverImageData else { return nil }
+        return UIImage(data: data)
     }
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            heroBackdrop
-                .frame(maxWidth: .infinity)
-                .frame(height: heroHeight)
+        ZStack {
+            // Fondo: imagen borrosa + oscurecimiento
+            backdropLayer
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
 
-            LinearGradient(
-                stops: [
-                    .init(color: .black.opacity(0.2), location: 0),
-                    .init(color: .black.opacity(0.45), location: 0.45),
-                    .init(color: .black.opacity(0.88), location: 1)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: heroHeight)
-            .allowsHitTesting(false)
-
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top) {
-                    if let onNavigateBack {
+            // Contenido
+            VStack(spacing: 0) {
+                // Botón "Biblioteca" en iPad (encima del contenido)
+                if let onNavigateBack {
+                    HStack {
                         Button(action: onNavigateBack) {
                             Label("Biblioteca", systemImage: "chevron.left")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
+                                .padding(.vertical, 7)
                                 .background(.ultraThinMaterial, in: Capsule())
-                                .shadow(color: .black.opacity(0.28), radius: 10, y: 3)
                         }
                         .buttonStyle(.plain)
+                        Spacer()
                     }
-                    Spacer()
+                    .padding(.horizontal, headerPad)
+                    .padding(.top, 10)
+                    .padding(.bottom, 6)
                 }
-                .padding(.horizontal, isLargeCanvas ? 24 : 16)
-                .padding(.top, isLargeCanvas ? 12 : 8)
 
-                Spacer(minLength: 0)
+                // Fila principal: thumbnail · info · dominio
+                HStack(alignment: .center, spacing: 14) {
+                    // Thumbnail
+                    thumbnailView
+                        .frame(width: thumbSize, height: thumbSize)
+                        .shadow(color: .black.opacity(0.4), radius: 10, y: 4)
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("ESTUDIO")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.white.opacity(0.68))
-                        .tracking(2.4)
+                    // Info: label + título + descripción + botones
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("ESTUDIO")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .tracking(2)
 
-                    Text(study.title)
-                        .font(
-                            isLargeCanvas
-                                ? .system(size: 36, weight: .bold, design: .rounded)
-                                : .system(size: 28, weight: .bold, design: .rounded)
-                        )
-                        .foregroundStyle(.white)
-                        .lineLimit(4)
-                        .minimumScaleFactor(0.72)
-                        .shadow(color: .black.opacity(0.5), radius: 16, y: 5)
+                        Text(study.title)
+                            .font(isLargeCanvas
+                                  ? .system(size: 22, weight: .bold, design: .rounded)
+                                  : .system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.8)
 
-                    if !study.desc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text(study.desc)
-                            .font(isLargeCanvas ? .body : .subheadline)
-                            .foregroundStyle(.white.opacity(0.92))
-                            .lineLimit(isLargeCanvas ? 3 : 2)
-                            .shadow(color: .black.opacity(0.4), radius: 8, y: 2)
-                    }
+                        if !study.desc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text(study.desc)
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.7))
+                                .lineLimit(1)
+                        }
 
-                    if hasPractice {
-                        HStack(spacing: 10) {
+                        // Botones de acción
+                        HStack(spacing: isLargeCanvas ? 10 : 7) {
                             if ankiCardCount > 0 {
-                                Button {
-                                    onStartAnkiSession?()
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "rectangle.on.rectangle.angled").font(.caption)
-                                        if ankiDueCount > 0 {
-                                            Text("Flashcards · \(ankiDueCount) pendiente\(ankiDueCount == 1 ? "" : "s")")
-                                                .fontWeight(.semibold)
-                                                .font(isLargeCanvas ? .body : .subheadline)
-                                        } else {
-                                            Text("Flashcards · Repasar todo")
-                                                .fontWeight(.semibold)
-                                                .font(isLargeCanvas ? .body : .subheadline)
-                                        }
-                                    }
-                                    .foregroundStyle(Color.aeroNavy)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, isLargeCanvas ? 12 : 9)
-                                    .background(Color.white, in: Capsule())
-                                    .shadow(color: .black.opacity(0.2), radius: 8, y: 3)
-                                }
+                                actionChip(
+                                    icon: "rectangle.on.rectangle.angled",
+                                    label: ankiDueCount > 0
+                                        ? "\(ankiDueCount) pendiente\(ankiDueCount == 1 ? "" : "s")"
+                                        : "Flashcards",
+                                    action: { onStartAnkiSession?() }
+                                )
                             }
-
                             if reviewCount > 0 {
                                 NavigationLink(destination: PracticeSessionView(study: study)) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "doc.questionmark.fill").font(.caption)
-                                        Text("Examen · \(reviewCount)")
-                                            .fontWeight(.semibold)
-                                            .font(isLargeCanvas ? .body : .subheadline)
-                                    }
-                                    .foregroundStyle(Color.white)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, isLargeCanvas ? 12 : 9)
-                                    .background(Color.aeroLavender.opacity(0.42), in: Capsule())
-                                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.4), lineWidth: 1))
+                                    chipContent(icon: "doc.questionmark.fill",
+                                                label: "Examen · \(reviewCount)")
                                 }
+                                .buttonStyle(.plain)
+                            }
+                            if let onStartPodcast {
+                                Button(action: onStartPodcast) {
+                                    if isLargeCanvas {
+                                        chipContent(icon: "headphones", label: "Podcast")
+                                    } else {
+                                        Image(systemName: "headphones")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.white)
+                                            .padding(7)
+                                            .background(.ultraThinMaterial, in: Circle())
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Escuchar como podcast")
                             }
                         }
-                        .padding(.top, 4)
+                        .padding(.top, 5)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    // Anillo de dominio
+                    masteryRing
                 }
-                .padding(.horizontal, isLargeCanvas ? 24 : 18)
-                .padding(.bottom, isLargeCanvas ? 24 : 18)
+                .padding(.horizontal, headerPad)
+                .padding(.vertical, headerPad)
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: heroHeight)
+        .frame(height: isLargeCanvas ? 164 : 124)
         .task(id: study.id) {
             wikipediaFetchFinished = false
             wikipediaThumbnail = await WikipediaThumbnailService.thumbnailURL(for: study.title)
             wikipediaFetchFinished = true
         }
-    }
-
-    @ViewBuilder
-    private var heroBackdrop: some View {
-        if let url = wikipediaThumbnail {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .empty:
-                    heroFallbackGradient
-                        .overlay { ProgressView().tint(.white) }
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure:
-                    heroFallbackGradient
-                @unknown default:
-                    heroFallbackGradient
-                }
+        .onChange(of: pickerItem) { _, item in
+            guard let item else { return }
+            Task {
+                guard let data = try? await item.loadTransferable(type: Data.self),
+                      let ui = UIImage(data: data),
+                      let compressed = ui.jpegData(compressionQuality: 0.78) else { return }
+                onImagePicked?(compressed)
+                pickerItem = nil
             }
-        } else {
-            heroFallbackGradient
-                .overlay(alignment: .topTrailing) {
-                    if !wikipediaFetchFinished {
-                        ProgressView()
-                            .tint(.white.opacity(0.85))
-                            .padding(14)
-                    }
-                }
         }
     }
 
-    private var heroFallbackGradient: some View {
+    // MARK: Sub-views
+
+    @ViewBuilder
+    private var backdropLayer: some View {
+        ZStack {
+            fallbackGradient
+            // Imagen de fondo borrosa: custom tiene prioridad sobre Wikipedia
+            if let ui = customUIImage {
+                Image(uiImage: ui)
+                    .resizable()
+                    .scaledToFill()
+                    .blur(radius: 32, opaque: true)
+            } else if let url = wikipediaThumbnail {
+                AsyncImage(url: url) { phase in
+                    if case .success(let img) = phase {
+                        img.resizable()
+                            .scaledToFill()
+                            .blur(radius: 32, opaque: true)
+                    }
+                }
+            }
+            // Oscurecimiento sobre el blur para legibilidad del texto
+            Color.black.opacity(0.48)
+        }
+    }
+
+    @ViewBuilder
+    private var thumbnailView: some View {
+        ZStack(alignment: .bottomTrailing) {
+            ZStack {
+                fallbackGradient
+                if let ui = customUIImage {
+                    Image(uiImage: ui)
+                        .resizable()
+                        .scaledToFill()
+                } else if let url = wikipediaThumbnail {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let img):
+                            img.resizable().scaledToFill()
+                        case .empty:
+                            Color.clear.overlay { ProgressView().tint(.white) }
+                        default:
+                            placeholderIcon
+                        }
+                    }
+                } else if wikipediaFetchFinished {
+                    placeholderIcon
+                } else {
+                    ProgressView().tint(.white.opacity(0.8))
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            // Botón de editar imagen
+            PhotosPicker(selection: $pickerItem, matching: .images) {
+                Image(systemName: "pencil")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(5)
+                    .background(Color.black.opacity(0.6), in: Circle())
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.4), lineWidth: 0.5))
+            }
+            .buttonStyle(.plain)
+            .offset(x: 4, y: 4)
+        }
+    }
+
+    private var placeholderIcon: some View {
+        Image(systemName: "text.book.closed.fill")
+            .font(.title2)
+            .foregroundStyle(.white.opacity(0.4))
+    }
+
+    private var fallbackGradient: some View {
         LinearGradient(
-            colors: [
-                Color(red: 0.14, green: 0.16, blue: 0.28),
-                Color.aeroNavy,
-                Color.aeroNavyDeep
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
+            colors: [Color(red: 0.14, green: 0.16, blue: 0.28), Color.aeroNavy],
+            startPoint: .topLeading, endPoint: .bottomTrailing
         )
+    }
+
+    private var masteryRing: some View {
+        VStack(spacing: 5) {
+            Text("Dominio\ndel tema")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.18), lineWidth: 3.5)
+                Circle()
+                    .trim(from: 0, to: masteryProgress)
+                    .stroke(Color.white, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(.spring(response: 0.7), value: masteryProgress)
+                Text("\(masteryPercent)%")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: isLargeCanvas ? 56 : 48, height: isLargeCanvas ? 56 : 48)
+        }
+    }
+
+    @ViewBuilder
+    private func actionChip(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            chipContent(icon: icon, label: label)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func chipContent(icon: String, label: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon).font(.caption2)
+            Text(label).font(.caption.weight(.semibold))
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.25), lineWidth: 1))
     }
 }
 
@@ -412,7 +528,7 @@ struct StudyTabPicker: View {
 
 // MARK: - Resources Tab
 
-private enum TopicMasterySnapshot {
+fileprivate enum TopicMasterySnapshot {
     static func compute(from viewModel: StudyDetailViewModel) -> (percent: Int, progress: Double, footnote: String) {
         let resources = viewModel.resources.count
         let examAttempts = viewModel.flashcards.flatMap(\.attempts)
@@ -626,6 +742,7 @@ struct AnkiCardsTab: View {
     @ObservedObject var viewModel: StudyDetailViewModel
     let isLargeCanvas: Bool
     @State private var showingSession = false
+    @State private var showingAllSession = false
 
     private var columns: [GridItem] {
         isLargeCanvas
@@ -670,43 +787,53 @@ struct AnkiCardsTab: View {
                 .padding(.bottom, 90)
             }
             .safeAreaInset(edge: .bottom) {
-                Button {
-                    showingSession = true
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "play.fill")
-                        if dueCount > 0 {
-                            Text("Practicar · \(dueCount) pendiente\(dueCount == 1 ? "" : "s")")
-                                .fontWeight(.semibold)
-                        } else {
-                            Text("Repasar todo · \(totalCount) tarjeta\(totalCount == 1 ? "" : "s")")
-                                .fontWeight(.semibold)
-                        }
-                        Spacer()
-                        if dueCount > 0 {
-                            Text("SM-2")
-                                .font(.caption2)
-                                .padding(.horizontal, 6).padding(.vertical, 3)
-                                .background(.white.opacity(0.2), in: Capsule())
-                        } else {
-                            Text("Libre")
+                VStack(spacing: 8) {
+                    // Botón primario
+                    Button { showingSession = true } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "play.fill")
+                            if dueCount > 0 {
+                                Text("Practicar · \(dueCount) pendiente\(dueCount == 1 ? "" : "s")")
+                                    .fontWeight(.semibold)
+                            } else {
+                                Text("Repasar todo · \(totalCount) tarjeta\(totalCount == 1 ? "" : "s")")
+                                    .fontWeight(.semibold)
+                            }
+                            Spacer()
+                            Text(dueCount > 0 ? "SM-2" : "Libre")
                                 .font(.caption2)
                                 .padding(.horizontal, 6).padding(.vertical, 3)
                                 .background(.white.opacity(0.2), in: Capsule())
                         }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 18).padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(LinearGradient(
+                                    colors: dueCount > 0
+                                        ? [Color.aeroNavy, Color.aeroNavyDeep]
+                                        : [Color.aeroMint.opacity(0.85), Color.aeroNavy],
+                                    startPoint: .leading, endPoint: .trailing
+                                ))
+                                .shadow(color: Color.aeroNavy.opacity(0.35), radius: 14, y: 6)
+                        )
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18).padding(.vertical, 14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(LinearGradient(
-                                colors: dueCount > 0
-                                    ? [Color.aeroNavy, Color.aeroNavyDeep]
-                                    : [Color.aeroMint.opacity(0.85), Color.aeroNavy],
-                                startPoint: .leading, endPoint: .trailing
-                            ))
-                            .shadow(color: Color.aeroNavy.opacity(0.35), radius: 14, y: 6)
-                    )
+
+                    // Botón secundario: repasar todo aunque no haya pendientes (solo visible cuando hay pendientes para no duplicar)
+                    if dueCount > 0 {
+                        Button { showingAllSession = true } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.clockwise")
+                                Text("Repasar todo · \(totalCount) tarjeta\(totalCount == 1 ? "" : "s")")
+                            }
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(.horizontal, isLargeCanvas ? 24 : 16)
                 .padding(.top, 10).padding(.bottom, 16)
@@ -714,6 +841,9 @@ struct AnkiCardsTab: View {
             }
             .fullScreenCover(isPresented: $showingSession) {
                 AnkiSessionView(viewModel: viewModel)
+            }
+            .fullScreenCover(isPresented: $showingAllSession) {
+                AnkiSessionView(viewModel: viewModel, forceAll: true)
             }
         }
     }
@@ -852,29 +982,51 @@ struct ExamenSimuladoTab: View {
                 .padding(.bottom, 90)
             }
             .safeAreaInset(edge: .bottom) {
-                NavigationLink(destination: PracticeSessionView(study: viewModel.study)) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "play.fill")
-                        Text("Practicar examen · \(viewModel.reviewQueue.count) pregunta\(viewModel.reviewQueue.count == 1 ? "" : "s")")
-                            .fontWeight(.semibold)
-                        Spacer()
-                        Text("IA evalúa")
-                            .font(.caption2)
-                            .padding(.horizontal, 6).padding(.vertical, 3)
-                            .background(.white.opacity(0.2), in: Capsule())
+                VStack(spacing: 8) {
+                    // Botón primario: pendientes SM-2 (o "Empezar" si no hay pendientes)
+                    NavigationLink(destination: PracticeSessionView(study: viewModel.study)) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "play.fill")
+                            if viewModel.reviewQueue.count > 0 {
+                                Text("Practicar · \(viewModel.reviewQueue.count) pendiente\(viewModel.reviewQueue.count == 1 ? "" : "s")")
+                                    .fontWeight(.semibold)
+                            } else {
+                                Text("Empezar examen")
+                                    .fontWeight(.semibold)
+                            }
+                            Spacer()
+                            Text("IA evalúa")
+                                .font(.caption2)
+                                .padding(.horizontal, 6).padding(.vertical, 3)
+                                .background(.white.opacity(0.2), in: Capsule())
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 18).padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(LinearGradient(
+                                    colors: [Color.aeroNavy, Color.aeroNavyDeep],
+                                    startPoint: .leading, endPoint: .trailing
+                                ))
+                                .shadow(color: Color.aeroNavy.opacity(0.35), radius: 14, y: 6)
+                        )
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18).padding(.vertical, 14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(LinearGradient(
-                                colors: [Color.aeroNavy, Color.aeroNavyDeep],
-                                startPoint: .leading, endPoint: .trailing
-                            ))
-                            .shadow(color: Color.aeroNavy.opacity(0.35), radius: 14, y: 6)
-                    )
+                    .buttonStyle(.plain)
+
+                    // Botón secundario: practicar todas las preguntas (ignora SM-2)
+                    NavigationLink(destination: PracticeSessionView(study: viewModel.study, practiceAll: true)) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Repasar todo · \(viewModel.flashcards.count) pregunta\(viewModel.flashcards.count == 1 ? "" : "s")")
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
                 .padding(.horizontal, isLargeCanvas ? 24 : 16)
                 .padding(.top, 10).padding(.bottom, 16)
                 .background(.ultraThinMaterial)
@@ -1303,10 +1455,16 @@ struct AnkiGapCardView: View {
     @State private var isExpanded = false
 
     private var severityColor: Color {
-        gap.error_rate >= 0.7 ? .red : gap.error_rate >= 0.5 ? .orange : Color(red: 0.9, green: 0.6, blue: 0)
+        switch gap.severity {
+        case .fault: return .red
+        case .warning: return .orange
+        }
     }
     private var severityLabel: String {
-        gap.error_rate >= 0.7 ? "Muy difícil" : gap.error_rate >= 0.5 ? "Difícil" : "Moderado"
+        switch gap.severity {
+        case .fault: return "Fallo"
+        case .warning: return "Advertencia"
+        }
     }
 
     var body: some View {
@@ -1318,7 +1476,7 @@ struct AnkiGapCardView: View {
                     HStack(spacing: 14) {
                         ZStack {
                             Circle().fill(severityColor.opacity(0.12)).frame(width: 50, height: 50)
-                            Text("\(Int(gap.error_rate * 100))%")
+                            Text("\(gap.errors)")
                                 .font(.subheadline).fontWeight(.bold).foregroundStyle(severityColor)
                         }
                         VStack(alignment: .leading, spacing: 3) {
@@ -1342,15 +1500,6 @@ struct AnkiGapCardView: View {
                     if isExpanded {
                         Divider()
                         VStack(alignment: .leading, spacing: 8) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text("Tasa de olvido").font(.caption2).foregroundStyle(.secondary)
-                                    Spacer()
-                                    Text("\(Int(gap.error_rate * 100))%").font(.caption2).fontWeight(.semibold).foregroundStyle(severityColor)
-                                }
-                                ProgressView(value: gap.error_rate).tint(severityColor)
-                            }
-
                             HStack(spacing: 6) {
                                 Label("\(gap.total_attempts - gap.errors) recordadas", systemImage: "checkmark.circle.fill")
                                     .font(.caption2).foregroundStyle(.teal)
@@ -1405,11 +1554,17 @@ struct GapCardView: View {
     @State private var isExpanded = false
 
     private var severityColor: Color {
-        gap.error_rate >= 0.7 ? .red : gap.error_rate >= 0.5 ? .orange : Color(red: 0.9, green: 0.6, blue: 0)
+        switch gap.severity {
+        case .fault: return .red
+        case .warning: return .orange
+        }
     }
 
     private var severityLabel: String {
-        gap.error_rate >= 0.7 ? "Crítico" : gap.error_rate >= 0.5 ? "Alto" : "Moderado"
+        switch gap.severity {
+        case .fault: return "Fallo"
+        case .warning: return "Advertencia"
+        }
     }
 
     private func errorTypeLabel(_ type: ErrorType) -> String {
@@ -1430,7 +1585,7 @@ struct GapCardView: View {
                     HStack(spacing: 14) {
                         ZStack {
                             Circle().fill(severityColor.opacity(0.12)).frame(width: 50, height: 50)
-                            Text("\(Int(gap.error_rate * 100))%")
+                            Text("\(gap.errors)")
                                 .font(.subheadline).fontWeight(.bold).foregroundStyle(severityColor)
                         }
                         VStack(alignment: .leading, spacing: 3) {
@@ -1459,19 +1614,6 @@ struct GapCardView: View {
                         Divider()
 
                         VStack(alignment: .leading, spacing: 8) {
-                            // Barra de error rate
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text("Tasa de error")
-                                        .font(.caption2).foregroundStyle(.secondary)
-                                    Spacer()
-                                    Text("\(Int(gap.error_rate * 100))%")
-                                        .font(.caption2).fontWeight(.semibold).foregroundStyle(severityColor)
-                                }
-                                ProgressView(value: gap.error_rate)
-                                    .tint(severityColor)
-                            }
-
                             if let det = gap.dominant_error_type {
                                 HStack(alignment: .top, spacing: 8) {
                                     Image(systemName: "exclamationmark.bubble.fill")
