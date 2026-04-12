@@ -182,17 +182,17 @@ private struct AthenaeumSidebar: View {
             Color.aeroNavyDeep.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Branding
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Aero.")
-                        .font(.title3).fontWeight(.bold).foregroundStyle(.white)
-                    Text("ESPACIO ACADEMICO")
-                        .font(.caption2).foregroundStyle(.white.opacity(0.38)).tracking(0.9)
+                // Branding — carga explícita del PNG desde el bundle
+                VStack(alignment: .leading, spacing: 5) {
+                    AeroLogoView()
+                        .frame(width: 110, height: 41) // 110 × (264/713 × 110) ≈ 41
+                    Text("ESPACIO ACADÉMICO")
+                        .font(.caption2).foregroundStyle(.white.opacity(0.35)).tracking(0.9)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 20)
-                .padding(.top, 28)
-                .padding(.bottom, 20)
+                .padding(.top, 26)
+                .padding(.bottom, 18)
 
                 Divider().overlay(Color.white.opacity(0.10))
 
@@ -418,20 +418,27 @@ private struct LibraryWelcome: View {
                                                 )
                                         )
 
-                                    // Checkmark badge — only on selected cards
-                                    if isEditMode && isSelected {
-                                        ZStack {
-                                            Circle()
-                                                .fill(Color.aeroNavy)
-                                                .frame(width: 26, height: 26)
-                                                .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
-                                            Image(systemName: "checkmark")
-                                                .font(.system(size: 11, weight: .black))
-                                                .foregroundStyle(.white)
+                                    // X / checkmark badge
+                                    if isEditMode {
+                                        Button {
+                                            withAnimation(.spring(response: 0.2, dampingFraction: 0.65)) {
+                                                if isSelected { selectedIds.remove(row.id) }
+                                                else { selectedIds.insert(row.id) }
+                                            }
+                                        } label: {
+                                            ZStack {
+                                                Circle()
+                                                    .fill(isSelected ? Color.aeroNavy : Color.red)
+                                                    .frame(width: 26, height: 26)
+                                                    .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
+                                                Image(systemName: isSelected ? "checkmark" : "xmark")
+                                                    .font(.system(size: 11, weight: .black))
+                                                    .foregroundStyle(.white)
+                                            }
                                         }
+                                        .buttonStyle(.plain)
                                         .offset(x: 7, y: -7)
                                         .transition(.scale(scale: 0.3).combined(with: .opacity))
-                                        .allowsHitTesting(false)
                                     }
                                 }
                                 .animation(.spring(response: 0.28, dampingFraction: 0.72), value: isEditMode)
@@ -462,39 +469,21 @@ private struct LibraryWelcome: View {
 
                         // Bottom action bar
                         if isEditMode {
-                            HStack(spacing: 12) {
-                                // Count label
+                            HStack(spacing: 14) {
+                                Image(systemName: "info.circle")
+                                    .foregroundStyle(.secondary).font(.subheadline)
                                 Text(selectedIds.isEmpty
-                                     ? "Toca para seleccionar"
+                                     ? "Mantén presionado para seleccionar"
                                      : "\(selectedIds.count) seleccionado\(selectedIds.count == 1 ? "" : "s")")
                                     .font(.subheadline).foregroundStyle(.secondary)
-
                                 Spacer()
-
-                                // Cancel — always visible
-                                Button {
-                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
-                                        isEditMode = false
-                                        selectedIds.removeAll()
-                                    }
-                                } label: {
-                                    Text("Cancelar")
-                                        .font(.subheadline).fontWeight(.medium)
-                                        .foregroundStyle(Color.aeroNavy)
-                                        .padding(.horizontal, 14).padding(.vertical, 9)
-                                        .background(Color.aeroNavy.opacity(0.09),
-                                                    in: RoundedRectangle(cornerRadius: 10))
-                                }
-                                .buttonStyle(.plain)
-
-                                // Delete — only active when items selected
                                 Button { showDeleteConfirm = true } label: {
                                     Label("Eliminar", systemImage: "trash.fill")
                                         .font(.subheadline).fontWeight(.semibold)
                                         .foregroundStyle(.white)
-                                        .padding(.horizontal, 14).padding(.vertical, 9)
+                                        .padding(.horizontal, 16).padding(.vertical, 9)
                                         .background(
-                                            selectedIds.isEmpty ? Color.gray.opacity(0.25) : Color.red,
+                                            selectedIds.isEmpty ? Color.gray.opacity(0.30) : Color.red,
                                             in: RoundedRectangle(cornerRadius: 10)
                                         )
                                 }
@@ -806,6 +795,39 @@ struct CreateStudyView: View {
             .frame(maxWidth: AeroAdaptiveLayout.maxRegularContentWidth)
             .frame(maxWidth: .infinity, alignment: .center)
         }
+    }
+}
+
+// MARK: - Logo Helper
+
+/// Carga AERO.png desde el bundle explícitamente — funciona con PNGs sueltos (no solo .xcassets)
+private struct AeroLogoView: View {
+    var body: some View {
+        #if canImport(UIKit)
+        let img = UIImage(named: "AERO")
+        return Group {
+            if let img {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                Text("Aero.")
+                    .font(.title3).fontWeight(.bold).foregroundStyle(.white)
+            }
+        }
+        #else
+        let img = NSImage(named: "AERO")
+        return Group {
+            if let img {
+                Image(nsImage: img)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                Text("Aero.")
+                    .font(.title3).fontWeight(.bold).foregroundStyle(.white)
+            }
+        }
+        #endif
     }
 }
 
