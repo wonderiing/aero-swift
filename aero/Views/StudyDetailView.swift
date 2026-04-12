@@ -121,7 +121,7 @@ struct StudyDetailView: View {
             .frame(maxWidth: .infinity)
         }
         .navigationTitle("")
-        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
     }
 
     // MARK: Compact — original tab picker layout
@@ -344,8 +344,6 @@ struct StudyHeroHeader: View {
     @ViewBuilder
     private var backdropLayer: some View {
         ZStack {
-            fallbackGradient
-            // Imagen de fondo borrosa: custom tiene prioridad sobre Wikipedia
             if let ui = customUIImage {
                 Image(uiImage: ui)
                     .resizable()
@@ -357,10 +355,20 @@ struct StudyHeroHeader: View {
                         img.resizable()
                             .scaledToFill()
                             .blur(radius: 32, opaque: true)
+                    } else {
+                        Image("AERO_Placeholder")
+                            .resizable()
+                            .scaledToFill()
+                            .blur(radius: 32, opaque: true)
                     }
                 }
+            } else {
+                // Sin imagen: usa AERO como fondo borroso
+                Image("AERO_Placeholder")
+                    .resizable()
+                    .scaledToFill()
+                    .blur(radius: 32, opaque: true)
             }
-            // Oscurecimiento sobre el blur para legibilidad del texto
             Color.black.opacity(0.48)
         }
     }
@@ -369,31 +377,28 @@ struct StudyHeroHeader: View {
     private var thumbnailView: some View {
         ZStack(alignment: .bottomTrailing) {
             ZStack {
-                fallbackGradient
                 if let ui = customUIImage {
                     Image(uiImage: ui)
                         .resizable()
                         .scaledToFill()
                 } else if let url = wikipediaThumbnail {
                     AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let img):
+                        if case .success(let img) = phase {
                             img.resizable().scaledToFill()
-                        case .empty:
-                            Color.clear.overlay { ProgressView().tint(.white) }
-                        default:
-                            placeholderIcon
+                        } else {
+                            Image("AERO_Placeholder")
+                                .resizable()
+                                .scaledToFill()
                         }
                     }
-                } else if wikipediaFetchFinished {
-                    placeholderIcon
                 } else {
-                    ProgressView().tint(.white.opacity(0.8))
+                    Image("AERO_Placeholder")
+                        .resizable()
+                        .scaledToFill()
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
-            // Botón de editar imagen
             PhotosPicker(selection: $pickerItem, matching: .images) {
                 Image(systemName: "pencil")
                     .font(.system(size: 9, weight: .bold))
@@ -405,19 +410,6 @@ struct StudyHeroHeader: View {
             .buttonStyle(.plain)
             .offset(x: 4, y: 4)
         }
-    }
-
-    private var placeholderIcon: some View {
-        Image(systemName: "text.book.closed.fill")
-            .font(.title2)
-            .foregroundStyle(.white.opacity(0.4))
-    }
-
-    private var fallbackGradient: some View {
-        LinearGradient(
-            colors: [Color(red: 0.14, green: 0.16, blue: 0.28), Color.aeroNavy],
-            startPoint: .topLeading, endPoint: .bottomTrailing
-        )
     }
 
     private var masteryRing: some View {
